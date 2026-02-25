@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Map as MapIcon, Tent } from 'lucide-react';
-import type { CharacterResources, Progression } from '@/types/character';
+import type { Character, CharacterResources, Progression } from '@/types/character';
 import type { ActivityType } from '@/types/character';
 import type { MapEncounter, NexusReward } from '@/types/campaign';
 import { applyActivity, canAffordMove, spendSlipstream, canAffordEncounter, spendForEncounter } from '@/engine/resources';
 import { applyEncounterReward, spendCurrency } from '@/engine/progression';
 import { getAdjacentHexIds, generateRectGrid } from '@/engine/hex-math';
 import { placeEncounters, getDefaultStartHexId } from '@/engine/encounter-placement';
+import { loadCharacter } from '@/lib/character-storage';
 import { CharacterPanel } from '@/components/sidebar/CharacterPanel';
+import { CharacterCreation } from '@/components/character-creation/CharacterCreation';
 import { HexGrid } from '@/components/hex-grid/HexGrid';
 import { NexusTent } from '@/components/nexus/NexusTent';
 import { omijaCampaign } from '@/data/omija';
@@ -33,21 +35,37 @@ const MOCK_NEXUS_REWARDS: NexusReward[] = [
   { id: 5, title: 'Professional Massage', cost: 1000, icon: '💆', desc: '90-minute deep tissue massage' },
 ];
 
-const INITIAL_RESOURCES: CharacterResources = { slipstream: 5, strikes: 2, wards: 0, aether: 1 };
-const INITIAL_PROGRESSION: Progression = { xp: 4, level: 1, currency: 120 };
+const DEFAULT_RESOURCES: CharacterResources = { slipstream: 5, strikes: 2, wards: 0, aether: 1 };
+const DEFAULT_PROGRESSION: Progression = { xp: 0, level: 1, currency: 120 };
 const INITIAL_REVEALED = (() => {
   const set = new Set<string>([START_HEX_ID]);
   getAdjacentHexIds(startQ, startR).forEach((id) => set.add(id));
   return set;
 })();
 
+function getInitialState(character: Character | null) {
+  return {
+    resources: character?.resources ?? DEFAULT_RESOURCES,
+    progression: character?.progression ?? DEFAULT_PROGRESSION,
+  };
+}
+
 function App() {
+  const [character, setCharacter] = useState<Character | null>(() => loadCharacter());
+  const initialState = getInitialState(character);
   const [activeTab, setActiveTab] = useState<'map' | 'nexus'>('map');
-  const [resources, setResources] = useState(INITIAL_RESOURCES);
-  const [progression, setProgression] = useState(INITIAL_PROGRESSION);
+  const [resources, setResources] = useState(initialState.resources);
+  const [progression, setProgression] = useState(initialState.progression);
   const [playerPos, setPlayerPos] = useState({ q: startQ, r: startR });
   const [revealedHexes, setRevealedHexes] = useState(INITIAL_REVEALED);
   const [clearedHexes, setClearedHexes] = useState(new Set<string>([]));
+
+  useEffect(() => {
+    if (character) {
+      setResources(character.resources);
+      setProgression(character.progression);
+    }
+  }, [character]);
 
   const logWorkout = (type: ActivityType) => {
     setResources((prev) => applyActivity(prev, type));
@@ -101,9 +119,14 @@ function App() {
     alert(`Purchased ${reward.title}! Go treat yourself.`);
   };
 
+  if (!character) {
+    return <CharacterCreation onComplete={() => setCharacter(loadCharacter())} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex overflow-hidden">
       <CharacterPanel
+        character={character}
         progression={progression}
         resources={resources}
         onLogActivity={logWorkout}

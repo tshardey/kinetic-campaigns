@@ -22,9 +22,30 @@ export interface Progression {
   currency: number;
 }
 
+/** Playbook (class) identifier. */
+export type PlaybookId = 'rift-weaver' | 'gate-crasher' | 'wayfinder';
+
+/** A starting move option for a playbook. */
+export interface StartingMove {
+  id: string;
+  name: string;
+  description: string;
+}
+
+/** Playbook definition with stats and starting moves. */
+export interface PlaybookDefinition {
+  id: PlaybookId;
+  name: string;
+  description: string;
+  stats: CharacterStats;
+  startingMoves: StartingMove[];
+}
+
 export interface Character {
   id?: string;
-  name?: string;
+  name: string;
+  playbook: PlaybookId;
+  startingMoveId: string;
   stats: CharacterStats;
   resources: CharacterResources;
   progression: Progression;

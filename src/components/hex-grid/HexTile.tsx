@@ -6,6 +6,8 @@ interface HexTileProps {
   pixelX: number;
   pixelY: number;
   hexPoints: string;
+  /** Scale factor for hex shape (e.g. when using rect grid viewBox transform). Default 1. */
+  scale?: number;
   isRevealed: boolean;
   isPlayerHere: boolean;
   encounter: MapEncounter | undefined;
@@ -25,17 +27,21 @@ export function HexTile({
   pixelX,
   pixelY,
   hexPoints,
+  scale = 1,
   isRevealed,
   isPlayerHere,
   encounter,
   isCleared,
   onMove,
 }: HexTileProps) {
+  // Unrevealed: opaque fog of war. Revealed: transparent so underlying map shows through.
   let fill = '#1e293b';
+  let fillOpacity = 1;
   let stroke = '#0f172a';
   if (isRevealed) {
+    fillOpacity = 0.35;
     fill = '#334155';
-    stroke = '#475569';
+    stroke = 'rgba(71, 85, 105, 0.9)';
     if (encounter && !isCleared) {
       if (encounter.type === 'basic') fill = '#713f12';
       if (encounter.type === 'elite') fill = '#7f1d1d';
@@ -49,10 +55,11 @@ export function HexTile({
   const canClick = isRevealed && !isPlayerHere;
 
   return (
-    <g transform={`translate(${pixelX}, ${pixelY})`}>
+    <g transform={`translate(${pixelX}, ${pixelY}) scale(${scale})`}>
       <polygon
         points={hexPoints}
         fill={fill}
+        fillOpacity={fillOpacity}
         stroke={stroke}
         strokeWidth="2"
         className={`transition-all duration-300 ${canClick ? 'cursor-pointer hover:opacity-80' : ''}`}

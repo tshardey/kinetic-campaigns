@@ -5,19 +5,25 @@ import type { ActivityType } from '@/types/character';
 import type { MapEncounter, NexusReward } from '@/types/campaign';
 import { applyActivity, canAffordMove, spendSlipstream, canAffordEncounter, spendForEncounter } from '@/engine/resources';
 import { applyEncounterReward, spendCurrency } from '@/engine/progression';
-import { getAdjacentHexIds } from '@/engine/hex-math';
+import { getAdjacentHexIds, generateRectGrid } from '@/engine/hex-math';
+import { placeEncounters, getDefaultStartHexId } from '@/engine/encounter-placement';
 import { CharacterPanel } from '@/components/sidebar/CharacterPanel';
 import { HexGrid } from '@/components/hex-grid/HexGrid';
 import { NexusTent } from '@/components/nexus/NexusTent';
+import { omijaCampaign } from '@/data/omija';
 
-const MAP_RADIUS = 3;
+const MAP_COLS = 14;
+const MAP_ROWS = 9;
+const PLACEMENT_SEED = 42;
 
-const MOCK_ENCOUNTERS: Record<string, MapEncounter> = {
-  '1,0': { type: 'basic', name: 'Corrupted Drone', strikes: 1, gold: 10 },
-  '-1,-1': { type: 'elite', name: 'Aether Golem', strikes: 3, gold: 50 },
-  '0,3': { type: 'boss', name: 'Realm Warden', strikes: 5, gold: 200 },
-  '2,-2': { type: 'anomaly', name: 'Sealed Terminal', stat: 'Focus', cost: 2, gold: 30 },
-};
+const grid = generateRectGrid(MAP_COLS, MAP_ROWS);
+const START_HEX_ID = getDefaultStartHexId(MAP_COLS, MAP_ROWS);
+const [startQ, startR] = START_HEX_ID.split(',').map(Number);
+
+const PLACED_ENCOUNTERS = placeEncounters(
+  { grid, cols: MAP_COLS, rows: MAP_ROWS, seed: PLACEMENT_SEED, startHexId: START_HEX_ID },
+  omijaCampaign
+);
 
 const MOCK_NEXUS_REWARDS: NexusReward[] = [
   { id: 1, title: 'Fancy Bath Product', cost: 50, icon: '🛁', desc: 'Lush bath bomb or Epsom salts' },
@@ -29,17 +35,19 @@ const MOCK_NEXUS_REWARDS: NexusReward[] = [
 
 const INITIAL_RESOURCES: CharacterResources = { slipstream: 5, strikes: 2, wards: 0, aether: 1 };
 const INITIAL_PROGRESSION: Progression = { xp: 4, level: 1, currency: 120 };
-const INITIAL_REVEALED = new Set([
-  '0,0', '1,0', '-1,0', '0,1', '0,-1', '1,-1', '-1,1',
-]);
+const INITIAL_REVEALED = (() => {
+  const set = new Set<string>([START_HEX_ID]);
+  getAdjacentHexIds(startQ, startR).forEach((id) => set.add(id));
+  return set;
+})();
 
 function App() {
   const [activeTab, setActiveTab] = useState<'map' | 'nexus'>('map');
   const [resources, setResources] = useState(INITIAL_RESOURCES);
   const [progression, setProgression] = useState(INITIAL_PROGRESSION);
-  const [playerPos, setPlayerPos] = useState({ q: 0, r: 0 });
+  const [playerPos, setPlayerPos] = useState({ q: startQ, r: startR });
   const [revealedHexes, setRevealedHexes] = useState(INITIAL_REVEALED);
-  const [clearedHexes, setClearedHexes] = useState(new Set<string>(['0,0']));
+  const [clearedHexes, setClearedHexes] = useState(new Set<string>([]));
 
   const logWorkout = (type: ActivityType) => {
     setResources((prev) => applyActivity(prev, type));
@@ -132,11 +140,13 @@ function App() {
         <div className="flex-1 mt-16 relative">
           {activeTab === 'map' && (
             <HexGrid
-              radius={MAP_RADIUS}
+              cols={MAP_COLS}
+              rows={MAP_ROWS}
+              mapBackgroundUrl={omijaCampaign.realm.map_background_url}
               playerPos={playerPos}
               revealedHexes={revealedHexes}
               clearedHexes={clearedHexes}
-              encounters={MOCK_ENCOUNTERS}
+              encounters={PLACED_ENCOUNTERS}
               onMove={movePlayer}
               onEngageEncounter={engageEncounter}
             />

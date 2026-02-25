@@ -4,6 +4,10 @@ import { defineConfig } from "vite";
 import { fileURLToPath } from "url";
 
 export default defineConfig({
+  test: {
+    globals: true,
+    environment: "node",
+  },
   base: "/kinetic-campaigns/",
   plugins: [react(), tailwindcss()],
   resolve: {

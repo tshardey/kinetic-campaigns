@@ -46,5 +46,7 @@ coverage/
 # .parcel-cache/
 # .turbo/
 
-# Local images
+# Local image working directory (not deployed)
 images/
+
+# Campaign images in public/campaign/omija/ are tracked and deploy with the build

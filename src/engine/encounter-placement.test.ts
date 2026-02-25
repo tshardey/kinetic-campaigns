@@ -78,7 +78,7 @@ describe('placeEncounters', () => {
     const keysB = Object.keys(b).sort();
     // At least some hex ids or encounter assignments may differ
     const sameKeys = keysA.length === keysB.length && keysA.every((k, i) => k === keysB[i]);
-    const sameNames = keysA.every((id) => a[id].name === b[id]);
+    const sameNames = keysA.every((id) => a[id].name === b[id].name);
     expect(sameKeys && sameNames).toBe(false);
   });
 
@@ -132,7 +132,7 @@ describe('placeEncounters', () => {
       { grid, cols, rows, seed: 42, startHexId },
       minimalCampaign
     );
-    for (const [id, enc] of Object.entries(result)) {
+    for (const [, enc] of Object.entries(result)) {
       expect(enc.name).toBeDefined();
       if (enc.type === 'anomaly') {
         expect('stat' in enc && 'cost' in enc).toBe(true);

@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  DEFAULT_HEX_SIZE,
   offsetToAxial,
   axialToOffset,
   generateRectGrid,

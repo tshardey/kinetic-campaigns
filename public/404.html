@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Redirecting…</title>
+  <script>
+    (function () {
+      var base = '/kinetic-campaigns/';
+      var path = location.pathname.replace(/\/$/, '') || '/';
+      if (path.indexOf(base) !== 0) path = base + path.replace(/^\//, '');
+      sessionStorage.redirect = path;
+      location.replace(base);
+    })();
+  </script>
+  <meta http-equiv="refresh" content="0; url=/kinetic-campaigns/" />
+</head>
+<body>
+  <p>Redirecting to the app…</p>
+</body>
+</html>

@@ -5,6 +5,14 @@
 import type { Character } from '@/types/character';
 
 const STORAGE_KEY = 'kinetic-campaigns-character';
+const DEFAULT_HP = 5;
+
+function ensureCharacterHp(c: Character): Character {
+  if (typeof c.hp !== 'number' || typeof c.maxHp !== 'number') {
+    return { ...c, hp: DEFAULT_HP, maxHp: DEFAULT_HP };
+  }
+  return c;
+}
 
 export function loadCharacter(): Character | null {
   try {
@@ -12,7 +20,7 @@ export function loadCharacter(): Character | null {
     if (!raw) return null;
     const data = JSON.parse(raw) as Character;
     if (!data.name || !data.playbook || !data.startingMoveId || !data.stats) return null;
-    return data;
+    return ensureCharacterHp(data);
   } catch {
     return null;
   }

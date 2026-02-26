@@ -17,6 +17,8 @@ const validCharacter: Character = {
   stats: { brawn: 2, flow: 0, haste: 1, focus: -1 },
   resources: { slipstream: 5, strikes: 2, wards: 0, aether: 1 },
   progression: { xp: 0, level: 1, currency: 120 },
+  hp: 5,
+  maxHp: 5,
 };
 
 function createMockStorage(): Storage {
@@ -78,6 +80,11 @@ describe('game-state-storage', () => {
       expect(map.riftProgress).toEqual({});
     });
 
+    it('returns empty encounterHealth', () => {
+      const map = getDefaultMapState(COLS, ROWS);
+      expect(map.encounterHealth).toEqual({});
+    });
+
     it('returns different playerPos for different grid sizes', () => {
       const map14x9 = getDefaultMapState(14, 9);
       const map8x6 = getDefaultMapState(8, 6);
@@ -135,6 +142,20 @@ describe('game-state-storage', () => {
       const loaded = loadGameState(COLS, ROWS);
       expect(loaded!.character.progression.currency).toBe(200);
       expect(loaded!.mapState.clearedHexes).toContain('2,3');
+    });
+
+    it('persists and restores encounterHealth', () => {
+      const mapState: MapState = {
+        ...getDefaultMapState(COLS, ROWS),
+        encounterHealth: { '3,4': 2, '5,6': 1 },
+      };
+      const state: PersistedGameState = {
+        character: validCharacter,
+        mapState,
+      };
+      saveGameState(state);
+      const loaded = loadGameState(COLS, ROWS);
+      expect(loaded!.mapState.encounterHealth).toEqual({ '3,4': 2, '5,6': 1 });
     });
   });
 

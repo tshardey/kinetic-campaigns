@@ -19,6 +19,8 @@ export interface MapState {
   clearedHexes: string[];
   /** Narrative rift progress (realm-specific). */
   riftProgress?: RiftProgress;
+  /** Remaining strikes required per encounter hex id; players can chip away over multiple days. */
+  encounterHealth?: Record<string, number>;
 }
 
 export interface PersistedGameState {
@@ -40,7 +42,17 @@ export function getDefaultMapState(cols: number, rows: number): MapState {
     revealedHexes: Array.from(revealed),
     clearedHexes: [],
     riftProgress: {},
+    encounterHealth: {},
   };
+}
+
+const DEFAULT_HP = 5;
+
+function ensureCharacterHp(c: Character): Character {
+  if (typeof c.hp !== 'number' || typeof c.maxHp !== 'number') {
+    return { ...c, hp: DEFAULT_HP, maxHp: DEFAULT_HP };
+  }
+  return c;
 }
 
 function parseLegacyCharacter(): Character | null {
@@ -49,7 +61,7 @@ function parseLegacyCharacter(): Character | null {
     if (!raw) return null;
     const data = JSON.parse(raw) as Character;
     if (!data.name || !data.playbook || !data.startingMoveId || !data.stats) return null;
-    return data;
+    return ensureCharacterHp(data);
   } catch {
     return null;
   }
@@ -67,9 +79,13 @@ export function loadGameState(cols: number, rows: number): PersistedGameState | 
       if (data.character && data.mapState) {
         const c = data.character;
         if (c.name && c.playbook && c.startingMoveId && c.stats) {
+          const mapState = {
+            ...data.mapState,
+            encounterHealth: data.mapState.encounterHealth ?? {},
+          };
           return {
-            character: data.character,
-            mapState: data.mapState,
+            character: ensureCharacterHp(data.character),
+            mapState,
             pendingLevelUp: data.pendingLevelUp ?? false,
             pendingProgressionAfterLevelUp: data.pendingProgressionAfterLevelUp ?? undefined,
           };

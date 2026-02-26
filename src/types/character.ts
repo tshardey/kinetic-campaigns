@@ -60,6 +60,8 @@ export interface Character {
   stats: CharacterStats;
   resources: CharacterResources;
   progression: Progression;
+  hp: number;
+  maxHp: number;
   /** Loot collected from encounters. */
   inventory?: InventoryItem[];
   /** One-time shield from Iron-Silk Parasol (negates streak loss / missed workout penalty). */

@@ -42,6 +42,8 @@ export interface GameStateHookResult {
   setRevealedHexes: React.Dispatch<React.SetStateAction<Set<string>>>;
   clearedHexes: Set<string>;
   setClearedHexes: React.Dispatch<React.SetStateAction<Set<string>>>;
+  encounterHealth: Record<string, number>;
+  setEncounterHealth: React.Dispatch<React.SetStateAction<Record<string, number>>>;
   justClearedHexId: string | null;
   setJustClearedHexId: React.Dispatch<React.SetStateAction<string | null>>;
   riftProgress: RiftProgress;
@@ -95,6 +97,10 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
     const loaded = loadGameState(cols, rows);
     return loaded?.mapState ? new Set(loaded.mapState.clearedHexes) : new Set(defaultMap.clearedHexes);
   });
+  const [encounterHealth, setEncounterHealth] = useState<Record<string, number>>(() => {
+    const loaded = loadGameState(cols, rows);
+    return loaded?.mapState?.encounterHealth ?? defaultMap.encounterHealth ?? {};
+  });
   const [justClearedHexId, setJustClearedHexId] = useState<string | null>(null);
   const [riftProgress, setRiftProgress] = useState<RiftProgress>(() => {
     const loaded = loadGameState(cols, rows);
@@ -118,6 +124,7 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
           setPlayerPos(def.playerPos);
           setRevealedHexes(new Set(def.revealedHexes));
           setClearedHexes(new Set(def.clearedHexes));
+          setEncounterHealth(def.encounterHealth ?? {});
           setRiftProgress(def.riftProgress ?? {});
           setResources(next.resources);
           setProgression(next.progression);
@@ -333,11 +340,12 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
         revealedHexes: Array.from(revealedHexes),
         clearedHexes: Array.from(clearedHexes),
         riftProgress,
+        encounterHealth,
       },
       pendingLevelUp: pendingLevelUp || undefined,
       pendingProgressionAfterLevelUp: pendingProgressionAfterLevelUp ?? undefined,
     });
-  }, [character, resources, progression, inventory, playerPos, revealedHexes, clearedHexes, riftProgress, pendingLevelUp, pendingProgressionAfterLevelUp]);
+  }, [character, resources, progression, inventory, playerPos, revealedHexes, clearedHexes, encounterHealth, riftProgress, pendingLevelUp, pendingProgressionAfterLevelUp]);
 
   return {
     character,
@@ -354,6 +362,8 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
     setRevealedHexes,
     clearedHexes,
     setClearedHexes,
+    encounterHealth,
+    setEncounterHealth,
     justClearedHexId,
     setJustClearedHexId,
     riftProgress,

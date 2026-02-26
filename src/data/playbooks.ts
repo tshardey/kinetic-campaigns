@@ -130,5 +130,7 @@ export function buildCharacter(
     stats: { ...playbook.stats },
     resources: { ...DEFAULT_RESOURCES },
     progression: { ...DEFAULT_PROGRESSION },
+    hp: 5,
+    maxHp: 5,
   };
 }

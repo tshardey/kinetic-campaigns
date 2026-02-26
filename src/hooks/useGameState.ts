@@ -9,9 +9,10 @@ import type { ActivityType } from '@/types/character';
 import type { MapEncounter, NexusReward } from '@/types/campaign';
 import type { CampaignPackage } from '@/types/campaign';
 import type { RiftProgress } from '@/lib/game-state-storage';
-import { applyActivity, canAffordMove, spendSlipstream, canAffordEncounter, spendForEncounter } from '@/engine/resources';
-import { applyEncounterRewardWithLevelUpFlow, spendCurrency } from '@/engine/progression';
+import { applyActivity, canAffordMove, spendSlipstream, canAffordEncounter, spendForEncounter, spendStrikes, spendWards, spendAether } from '@/engine/resources';
+import { applyEncounterRewardWithLevelUpFlow, spendCurrency, addCurrency } from '@/engine/progression';
 import { getAdjacentHexIds } from '@/engine/hex-math';
+import { getDefaultStartHexId } from '@/engine/encounter-placement';
 import { applyArtifactOnAcquisition, getConsumableEffect, lootDropToInventoryItem } from '@/engine/inventory';
 import { canAffordRiftStage, spendForRiftStage } from '@/engine/rift';
 import { loadGameState, saveGameState, getDefaultMapState } from '@/lib/game-state-storage';
@@ -53,6 +54,8 @@ export interface GameStateHookResult {
   engageEncounter: (hexId: string, encounter: MapEncounter) => void;
   attemptRiftStage: (hexId: string, riftId: string, stageIndex: number) => boolean;
   useConsumable: (item: InventoryItem, choice?: 'haste' | 'flow') => void;
+  /** Spend 1 Aether per 1 HP restored (capped at maxHp). Returns true if any healing applied. */
+  heal: (amount: number) => boolean;
   purchaseReward: (reward: NexusReward) => void;
   /** Level-up flow: true when XP at cap and user must choose reward. */
   pendingLevelUp: boolean;
@@ -169,53 +172,110 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
 
   const engageEncounter = useCallback(
     (hexId: string, encounter: MapEncounter) => {
-      const costShape =
-        encounter.type === 'anomaly'
-          ? { type: 'anomaly' as const, cost: encounter.cost, resource: encounter.resource, resource_amount: encounter.resource_amount }
-          : { type: encounter.type, strikes: encounter.strikes };
-      if (!canAffordEncounter(resources, costShape)) {
-        if (encounter.type === 'anomaly') {
+      // Anomalies: resolve in one shot (existing cost + clear)
+      if (encounter.type === 'anomaly') {
+        const costShape = {
+          type: 'anomaly' as const,
+          cost: encounter.cost,
+          resource: encounter.resource,
+          resource_amount: encounter.resource_amount,
+        };
+        if (!canAffordEncounter(resources, costShape)) {
           const resourceLabel = encounter.resource === 'strikes' ? 'Strike(s)' : encounter.resource === 'wards' ? 'Ward(s)' : 'Slipstream';
           notify(`Need ${encounter.resource_amount} ${resourceLabel} and ${encounter.cost} Aether to resolve this anomaly.`, 'error');
-        } else {
-          notify(`Need ${encounter.strikes} Strikes to defeat ${encounter.name}. Log more Strength!`, 'error');
+          return;
         }
+        const nextResources = spendForEncounter(resources, costShape);
+        if (!nextResources) return;
+        setResources(nextResources);
+        setClearedHexes((prev) => new Set(prev).add(hexId));
+        setProgression((prev) => addCurrency(prev, encounter.gold));
+        setJustClearedHexId(hexId);
         return;
       }
-      const nextResources = spendForEncounter(resources, costShape);
+
+      // Combat: spend up to min(available Strikes, enemy remaining HP) per turn; then one retaliation if enemy survives
+      if (resources.strikes < 1) {
+        notify('Need 1 Strike to attack. Log more Strength!', 'error');
+        return;
+      }
+      if (!character) return;
+
+      const enemyStrikes = encounter.strikes ?? 1;
+      const currentEnemyHp = encounterHealth[hexId] ?? enemyStrikes;
+      const strikesToUse = Math.min(resources.strikes, currentEnemyHp);
+
+      const nextResources = spendStrikes(resources, strikesToUse);
       if (!nextResources) return;
       setResources(nextResources);
-      const xpGain = encounter.type === 'elite' ? 1 : encounter.type === 'boss' ? 3 : 0;
-      setClearedHexes((prev) => new Set(prev).add(hexId));
-      setProgression((prev) => {
-        const result = applyEncounterRewardWithLevelUpFlow(prev, encounter.gold, xpGain);
-        if (result.leveledUp && result.nextProgressionAfterLevelUp) {
-          setPendingLevelUp(true);
-          setPendingProgressionAfterLevelUp(result.nextProgressionAfterLevelUp);
-          return result.progression;
-        }
-        return result.progression;
+
+      const newEnemyHp = currentEnemyHp - strikesToUse;
+      setEncounterHealth((prev) => {
+        const next = { ...prev };
+        if (newEnemyHp <= 0) delete next[hexId];
+        else next[hexId] = newEnemyHp;
+        return next;
       });
 
-      if (encounter.type !== 'anomaly' && encounter.id) {
-        const fullEncounter = campaign.encounters.find(
-          (e) => e.id === encounter.id || (e.name === encounter.name && e.type === encounter.type)
-        );
-        if (fullEncounter?.loot_drop) {
-          const item = lootDropToInventoryItem(fullEncounter.loot_drop);
-          setInventory((prev) => [...prev, item]);
-          if (item.kind === 'artifact') {
-            setCharacterState((prev) => {
-              if (!prev) return null;
-              const newStats = applyArtifactOnAcquisition(item.id, prev.stats);
-              return newStats ? { ...prev, stats: newStats } : prev;
-            });
+      if (newEnemyHp <= 0) {
+        // Victory: grant loot/XP, mark hex cleared
+        const xpGain = encounter.type === 'elite' ? 1 : encounter.type === 'boss' ? 3 : 0;
+        setClearedHexes((prev) => new Set(prev).add(hexId));
+        setProgression((prev) => {
+          const result = applyEncounterRewardWithLevelUpFlow(prev, encounter.gold, xpGain);
+          if (result.leveledUp && result.nextProgressionAfterLevelUp) {
+            setPendingLevelUp(true);
+            setPendingProgressionAfterLevelUp(result.nextProgressionAfterLevelUp);
+            return result.progression;
+          }
+          return result.progression;
+        });
+        if (encounter.id) {
+          const fullEncounter = campaign.encounters.find(
+            (e) => e.id === encounter.id || (e.name === encounter.name && e.type === encounter.type)
+          );
+          if (fullEncounter?.loot_drop) {
+            const item = lootDropToInventoryItem(fullEncounter.loot_drop);
+            setInventory((prev) => [...prev, item]);
+            if (item.kind === 'artifact') {
+              setCharacterState((prev) => {
+                if (!prev) return null;
+                const newStats = applyArtifactOnAcquisition(item.id, prev.stats);
+                return newStats ? { ...prev, stats: newStats } : prev;
+              });
+            }
           }
         }
+        setJustClearedHexId(hexId);
+        return;
       }
-      setJustClearedHexId(hexId);
+
+      // Retaliation: enemy survived — Ward absorbs, else lose 1 HP
+      const hasWard = nextResources.wards > 0;
+      if (hasWard) {
+        const afterWard = spendWards(nextResources, 1);
+        if (afterWard) setResources(afterWard);
+      } else {
+        // No ward: lose 1 HP; at 0 HP apply knockback (deduct 50 currency, reset to starting hex, restore HP)
+        const wouldBeZeroHp = character.hp <= 1;
+        if (wouldBeZeroHp) {
+          notify('You hit zero health and are returning to the starting point.', 'info');
+        }
+        setCharacterState((prev) => {
+          if (!prev) return null;
+          const newHp = Math.max(0, prev.hp - 1);
+          if (newHp > 0) return { ...prev, hp: newHp };
+          return { ...prev, hp: prev.maxHp };
+        });
+        if (wouldBeZeroHp) {
+          const startHexId = getDefaultStartHexId(cols, rows);
+          const [q, r] = startHexId.split(',').map(Number);
+          setPlayerPos({ q, r });
+          setProgression((p) => ({ ...p, currency: Math.max(0, p.currency - 50) }));
+        }
+      }
     },
-    [resources, campaign.encounters, notify]
+    [resources, character, encounterHealth, cols, rows, campaign.encounters, notify]
   );
 
   const useConsumable = useCallback((item: InventoryItem, choice?: 'haste' | 'flow') => {
@@ -251,6 +311,25 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
     }
   }, []);
 
+  const heal = useCallback(
+    (amount: number): boolean => {
+      if (amount <= 0 || !character) return false;
+      const afterAether = spendAether(resources, amount);
+      if (!afterAether) return false;
+      setResources(afterAether);
+      setCharacterState((prev) => {
+        if (!prev) return null;
+        const maxHp = prev.maxHp ?? 5;
+        const currentHp = prev.hp ?? maxHp;
+        const newHp = Math.min(maxHp, currentHp + amount);
+        if (newHp === currentHp) return prev;
+        return { ...prev, hp: newHp };
+      });
+      return true;
+    },
+    [resources, character]
+  );
+
   const purchaseReward = useCallback((reward: NexusReward) => {
     setProgression((prev) => {
       const next = spendCurrency(prev, reward.cost);
@@ -265,19 +344,11 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
       if (!nextProg) return null;
       setCharacterState((prev) => {
         if (!prev) return null;
-        if (choice.type === 'new_move' || choice.type === 'cross_class_move') {
-          return {
-            ...prev,
-            learnedMoveIds: [...(prev.learnedMoveIds ?? []), choice.moveId],
-          };
-        }
-        return {
-          ...prev,
-          stats: {
-            ...prev.stats,
-            [choice.stat]: prev.stats[choice.stat] + 1,
-          },
-        };
+        const updated =
+          choice.type === 'new_move' || choice.type === 'cross_class_move'
+            ? { ...prev, learnedMoveIds: [...(prev.learnedMoveIds ?? []), choice.moveId] }
+            : { ...prev, stats: { ...prev.stats, [choice.stat]: prev.stats[choice.stat] + 1 } };
+        return { ...updated, hp: updated.maxHp ?? 5 };
       });
       setProgression(nextProg);
       setPendingLevelUp(false);
@@ -375,6 +446,7 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
     engageEncounter,
     attemptRiftStage,
     useConsumable,
+    heal,
     purchaseReward,
     pendingLevelUp,
     pendingProgressionAfterLevelUp,

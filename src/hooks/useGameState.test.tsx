@@ -305,6 +305,50 @@ describe('useGameState', () => {
     });
   });
 
+  describe('engageEncounter (combat)', () => {
+    const basicEncounter = { type: 'basic' as const, name: 'Scout', strikes: 1, gold: 10 };
+
+    it('requires 1 Strike to attack and notifies when lacking', () => {
+      const noStrikes = { ...validCharacter, resources: { ...validCharacter.resources, strikes: 0 } };
+      const toast = vi.fn();
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, toast })
+      );
+      act(() => result.current.setCharacter(noStrikes));
+      act(() => result.current.engageEncounter('2,2', basicEncounter));
+      expect(toast).toHaveBeenCalledWith('Need 1 Strike to attack. Log more Strength!', 'error');
+      expect(result.current.clearedHexes.has('2,2')).toBe(false);
+      expect(result.current.resources.strikes).toBe(0);
+    });
+
+    it('one attack defeats 1-strike enemy and clears hex', () => {
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      act(() => result.current.setCharacter(validCharacter));
+      act(() => result.current.engageEncounter('2,2', basicEncounter));
+      expect(result.current.clearedHexes.has('2,2')).toBe(true);
+      expect(result.current.progression.currency).toBe(120 + 10);
+      expect(result.current.resources.strikes).toBe(1);
+      expect(result.current.encounterHealth['2,2']).toBeUndefined();
+    });
+
+    it('heal spends 1 Aether for 1 HP and returns true', () => {
+      const wounded = { ...validCharacter, hp: 3, maxHp: 5, resources: { ...validCharacter.resources, aether: 2 } };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      act(() => result.current.setCharacter(wounded));
+      let ok = false;
+      act(() => {
+        ok = result.current.heal(1);
+      });
+      expect(ok).toBe(true);
+      expect(result.current.character!.hp).toBe(4);
+      expect(result.current.resources.aether).toBe(1);
+    });
+  });
+
   describe('attemptRiftStage', () => {
     it('spends resource cost and advances rift progress when affordable', () => {
       const { result } = renderHook(() =>
@@ -415,6 +459,12 @@ describe('useGameState', () => {
       act(() => {
         result.current.engageEncounter(hexId, eliteEncounter);
       });
+      act(() => {
+        result.current.engageEncounter(hexId, eliteEncounter);
+      });
+      act(() => {
+        result.current.engageEncounter(hexId, eliteEncounter);
+      });
 
       expect(result.current.pendingLevelUp).toBe(true);
       expect(result.current.progression.xp).toBe(10); // held at cap
@@ -446,6 +496,12 @@ describe('useGameState', () => {
         result.current.setCharacter(characterAtCap);
       });
 
+      act(() => {
+        result.current.engageEncounter('2,2', eliteEncounter);
+      });
+      act(() => {
+        result.current.engageEncounter('2,2', eliteEncounter);
+      });
       act(() => {
         result.current.engageEncounter('2,2', eliteEncounter);
       });
@@ -487,6 +543,28 @@ describe('useGameState', () => {
       expect(result.current.character!.learnedMoveIds).toContain('aura-of-conquest');
       expect(result.current.pendingLevelUp).toBe(false);
       expect(result.current.progression.level).toBe(2);
+    });
+
+    it('completeLevelUp restores HP to maxHp', () => {
+      const woundedAtCap = {
+        ...validCharacter,
+        hp: 2,
+        maxHp: 5,
+        progression: { xp: 10, level: 1, currency: 120 },
+        resources: { slipstream: 5, strikes: 3, wards: 0, aether: 1 },
+      };
+      saveGameState({
+        character: woundedAtCap,
+        mapState: getDefaultMapState(COLS, ROWS),
+        pendingLevelUp: true,
+        pendingProgressionAfterLevelUp: { xp: 0, level: 2, currency: 120 },
+      });
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      expect(result.current.character!.hp).toBe(2);
+      act(() => result.current.completeLevelUp({ type: 'stat', stat: 'focus' }));
+      expect(result.current.character!.hp).toBe(5);
     });
   });
 });

@@ -15,6 +15,8 @@ interface CharacterPanelProps {
   inventory: InventoryItem[];
   onLogActivity: (type: ActivityType, durationMinutes?: number) => void;
   onUseConsumable: (item: InventoryItem, choice?: 'haste' | 'flow') => void;
+  /** Spend 1 Aether per 1 HP (capped at maxHp). Called with amount to heal; returns true if any healing applied. */
+  onHeal?: (amount: number) => boolean;
   /** When set, show a close button (e.g. for mobile overlay). */
   onCloseSidebar?: () => void;
 }
@@ -26,6 +28,7 @@ export function CharacterPanel({
   inventory,
   onLogActivity,
   onUseConsumable,
+  onHeal,
   onCloseSidebar,
 }: CharacterPanelProps) {
   const [sheetExpanded, setSheetExpanded] = useState(true);
@@ -132,6 +135,17 @@ export function CharacterPanel({
                 </p>
               </div>
             </div>
+            {onHeal && (character.hp ?? 5) < (character.maxHp ?? 5) && resources.aether >= 1 && (
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => onHeal(1)}
+                  className="w-full text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-3 rounded-lg transition-colors"
+                >
+                  Heal (1 Aether → 1 HP)
+                </button>
+              </div>
+            )}
             {startingMove && (
               <div className="pt-1 border-t border-slate-700">
                 <p className="text-[10px] uppercase text-slate-500 font-medium mb-0.5">

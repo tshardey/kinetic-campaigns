@@ -46,6 +46,8 @@ interface EncounterPanelProps {
   lootFrameUrl: string;
   isVictory: boolean;
   resources?: CharacterResources;
+  /** Remaining hits for this encounter (combat only). When set, shows "X hits remaining". */
+  remainingHits?: number;
   onEngage: () => void;
   onContinue: () => void;
 }
@@ -56,6 +58,7 @@ export function EncounterPanel({
   lootFrameUrl,
   isVictory,
   resources,
+  remainingHits,
   onEngage,
   onContinue,
 }: EncounterPanelProps) {
@@ -73,10 +76,12 @@ export function EncounterPanel({
   const tierStyles = getTierStyles(encounter.type);
   const anomalyLore = isAnomaly && full && 'lore_text' in full ? (full as DimensionalAnomaly).lore_text : undefined;
 
+  // Combat: 1 Strike per attack; anomalies use full cost
   const costShape = isAnomaly
     ? { type: 'anomaly' as const, cost: encounter.cost, resource: encounter.resource, resource_amount: encounter.resource_amount }
-    : { type: encounter.type, strikes: encounter.strikes };
+    : { type: encounter.type, strikes: 1 };
   const canAfford = resources && canAffordEncounter(resources, costShape);
+  const hitsRemaining = remainingHits ?? (isCombat && !isAnomaly ? encounter.strikes : undefined);
   const resourceLabel = isAnomaly
     ? (encounter.resource === 'strikes' ? 'Strike(s)' : encounter.resource === 'wards' ? 'Ward(s)' : 'Slipstream')
     : '';
@@ -185,7 +190,10 @@ export function EncounterPanel({
             </div>
           ) : (
             <p className="text-slate-200 text-sm">
-              Requires <strong>{encounter.strikes} Strikes</strong> to defeat.
+              Use <strong>Strike(s)</strong> to attack
+              {hitsRemaining !== undefined && (
+                <> — <strong>{hitsRemaining} hit{hitsRemaining !== 1 ? 's' : ''} remaining</strong> (uses up to your Strikes or hits left per turn)</>
+              )}.
             </p>
           )}
         </div>

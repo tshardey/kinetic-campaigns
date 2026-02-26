@@ -35,12 +35,14 @@ function App() {
     clearedHexes,
     justClearedHexId,
     setJustClearedHexId,
+    encounterHealth,
     riftProgress,
     logWorkout,
     movePlayer,
     engageEncounter,
     attemptRiftStage,
     useConsumable,
+    heal,
     purchaseReward,
     pendingLevelUp,
     pendingProgressionAfterLevelUp,
@@ -85,6 +87,7 @@ function App() {
             inventory={inventory}
             onLogActivity={logWorkout}
             onUseConsumable={useConsumable}
+            onHeal={heal}
             onCloseSidebar={() => setSidebarOpen(false)}
           />
         </div>
@@ -145,6 +148,7 @@ function App() {
               clearedHexes={clearedHexes}
               justClearedHexId={justClearedHexId}
               encounters={placedEncounters}
+              encounterHealth={encounterHealth}
               placedRifts={placedRifts}
               riftProgress={riftProgress}
               campaign={campaign}

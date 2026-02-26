@@ -29,6 +29,8 @@ interface HexGridProps {
   /** When set, the panel for this hex shows victory state until onContinueFromVictory is called. */
   justClearedHexId: string | null;
   encounters: Record<string, MapEncounter>;
+  /** Remaining hits per encounter hex (combat only). */
+  encounterHealth?: Record<string, number>;
   /** Hex id -> rift id for narrative rift entrance hexes. */
   placedRifts: Record<string, string>;
   riftProgress: RiftProgress;
@@ -51,6 +53,7 @@ export function HexGrid({
   clearedHexes,
   justClearedHexId,
   encounters,
+  encounterHealth,
   placedRifts,
   riftProgress,
   campaign,
@@ -153,6 +156,7 @@ export function HexGrid({
       )}
       {showEncounterPanel && currentEncounter && (
         <EncounterPanel
+          remainingHits={encounterHealth?.[playerHexId]}
           encounter={currentEncounter}
           campaign={campaign}
           lootFrameUrl={lootFrameUrl}

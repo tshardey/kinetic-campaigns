@@ -110,7 +110,7 @@ const encounters: Encounter[] = [
     id: 'echo-forgotten-shogun',
     type: 'elite',
     name: 'Echo of the Forgotten Shogun',
-    image_url: `${CAMPAIGN_BASE}/encounters/elite/echo-forgotten-shogun.png`,
+    image_url: `${CAMPAIGN_BASE}/encounters/elite/echo-of-forgotten-shogun.png`,
     strikes: 3,
     gold: 50,
     xp: 1,
@@ -175,7 +175,7 @@ const riftStages: NarrativeRiftStage[] = [
   {
     id: 'shattered-guardian',
     name: 'The Shattered Guardian (Entry)',
-    required_stat: 'Brawn',
+    costs: [{ resource: 'strikes', amount: 2 }],
     description:
       'You stumble into a hidden glade bathed in unnaturally bright moonlight. The local feline spirits are in distress; the massive stone statue of their First Guardian has been shattered by a trespassing beast, its heavy granite pieces scattered across the grove. You must physically haul the massive stone fragments back to the center of the shrine to rebuild the monument.',
     image_url: `${CAMPAIGN_BASE}/scenes/shattered-guardian.png`,
@@ -183,7 +183,7 @@ const riftStages: NarrativeRiftStage[] = [
   {
     id: 'shadow-serpent',
     name: 'The Shadow Serpent (Conflict)',
-    required_stat: 'Flow',
+    costs: [{ resource: 'slipstream', amount: 2 }],
     description:
       'As the final piece of the statue slides into place, the Inkrot seeps into the glade, taking the form of a shadowy, multi-headed serpent. It snaps at the moonlight, attempting to devour the spiritual energy before the statue can activate. You must move with perfect agility, rhythmically dodging its lunges and redirecting the moonlight off reflective surfaces to charge the stone Guardian.',
     image_url: `${CAMPAIGN_BASE}/scenes/shadow-serpent.png`,
@@ -191,7 +191,11 @@ const riftStages: NarrativeRiftStage[] = [
   {
     id: 'lunar-purification',
     name: 'Lunar Purification (Resolution)',
-    required_stat: 'Flow',
+    costs: [
+      { resource: 'strikes', amount: 1 },
+      { resource: 'slipstream', amount: 1 },
+      { resource: 'wards', amount: 1 },
+    ],
     description:
       'With a deafening chime, the restored statue emits a blinding, purifying flare of lunar energy, instantly incinerating the shadow serpent. The tall grass parts, and dozens of awakened feline spirits emerge, bowing their heads in profound gratitude. They leave a token of their cosmic domain at your feet before vanishing into the shimmering night.',
     image_url: `${CAMPAIGN_BASE}/scenes/lunar-purification.png`,
@@ -205,6 +209,14 @@ const rifts: NarrativeRift[] = [
     description:
       'A 3-stage mini-campaign in a hidden glade. Restore the shattered Guardian, face the Shadow Serpent, and receive the gratitude of the feline spirits.',
     stages: riftStages,
+    completion_xp: 2,
+    completion_loot: {
+      id: 'moon-cat-coin',
+      name: 'Moon-Cat Coin',
+      kind: 'artifact',
+      description: 'A token of the cosmic domain. Permanently buffs Focus.',
+      image_url: `${CAMPAIGN_BASE}/loot/moon-cat-coin.png`,
+    },
   },
 ];
 

@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import type { AxialCoord } from '@/types/hex';
 import type { MapEncounter, CampaignPackage } from '@/types/campaign';
-import type { CharacterResources } from '@/types/character';
+import type { Character, CharacterResources } from '@/types/character';
+import type { RiftProgress } from '@/lib/game-state-storage';
 import {
   generateRectGrid,
   hexToPixel,
@@ -13,6 +14,7 @@ import {
 } from '@/engine/hex-math';
 import { HexTile } from './HexTile';
 import { EncounterPanel } from './EncounterPanel';
+import { NarrativeRiftPanel } from '@/components/rift/NarrativeRift';
 
 interface HexGridProps {
   /** Number of columns (rectangular grid). Use with rows for 16:9 map. */
@@ -27,11 +29,16 @@ interface HexGridProps {
   /** When set, the panel for this hex shows victory state until onContinueFromVictory is called. */
   justClearedHexId: string | null;
   encounters: Record<string, MapEncounter>;
+  /** Hex id -> rift id for narrative rift entrance hexes. */
+  placedRifts: Record<string, string>;
+  riftProgress: RiftProgress;
   campaign: CampaignPackage | null;
+  character: Character | null;
   lootFrameUrl: string;
   resources?: CharacterResources;
   onMove: (q: number, r: number, id: string) => void;
   onEngageEncounter: (hexId: string, encounter: MapEncounter) => void;
+  onAttemptRiftStage: (hexId: string, riftId: string, stageIndex: number) => boolean;
   onContinueFromVictory: () => void;
 }
 
@@ -44,11 +51,15 @@ export function HexGrid({
   clearedHexes,
   justClearedHexId,
   encounters,
+  placedRifts,
+  riftProgress,
   campaign,
+  character,
   lootFrameUrl,
   resources,
   onMove,
   onEngageEncounter,
+  onAttemptRiftStage,
   onContinueFromVictory,
 }: HexGridProps) {
   const grid = useMemo(() => generateRectGrid(cols, rows), [cols, rows]);
@@ -63,10 +74,24 @@ export function HexGrid({
   );
 
   const playerHexId = `${playerPos.q},${playerPos.r}`;
-  const currentEncounter = encounters[playerHexId];
+  const riftId = placedRifts[playerHexId];
+  const currentEncounter = riftId ? undefined : encounters[playerHexId];
+  const isRiftHex = Boolean(riftId);
   const isCurrentCleared = clearedHexes.has(playerHexId);
   const showVictory = isCurrentCleared && playerHexId === justClearedHexId;
-  const showPanel = currentEncounter && (!isCurrentCleared || showVictory);
+  const rift = riftId && campaign?.rifts ? campaign.rifts.find((r) => r.id === riftId) : null;
+  const completedRiftStages = riftId ? (riftProgress[riftId] ?? 0) : 0;
+  const [dismissedRiftHexId, setDismissedRiftHexId] = useState<string | null>(null);
+  useEffect(() => {
+    setDismissedRiftHexId(null);
+  }, [playerHexId]);
+  const showRiftPanel =
+    isRiftHex &&
+    character &&
+    rift &&
+    (!isCurrentCleared || showVictory) &&
+    dismissedRiftHexId !== playerHexId;
+  const showEncounterPanel = !showRiftPanel && currentEncounter && (!isCurrentCleared || showVictory);
 
   const viewBox = `0 0 ${transform.viewBoxWidth} ${transform.viewBoxHeight}`;
   const [bgImageError, setBgImageError] = useState(false);
@@ -104,6 +129,7 @@ export function HexGrid({
                 isPlayerHere={playerPos.q === hex.q && playerPos.r === hex.r}
                 encounter={encounters[hex.id]}
                 isCleared={clearedHexes.has(hex.id)}
+                isRiftHex={hex.id in placedRifts}
                 onMove={onMove}
               />
             );
@@ -112,7 +138,20 @@ export function HexGrid({
         </svg>
       </div>
 
-      {showPanel && currentEncounter && (
+      {showRiftPanel && rift && character && resources !== undefined && (
+        <NarrativeRiftPanel
+          rift={rift}
+          character={character}
+          resources={resources}
+          completedStages={completedRiftStages}
+          isJustCompleted={showVictory}
+          lootFrameUrl={lootFrameUrl}
+          onAttemptStage={(stageIndex) => onAttemptRiftStage(playerHexId, rift.id, stageIndex)}
+          onContinue={onContinueFromVictory}
+          onLeave={() => setDismissedRiftHexId(playerHexId)}
+        />
+      )}
+      {showEncounterPanel && currentEncounter && (
         <EncounterPanel
           encounter={currentEncounter}
           campaign={campaign}

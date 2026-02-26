@@ -8,10 +8,12 @@ import type { Character, CharacterResources, Progression, InventoryItem } from '
 import type { ActivityType } from '@/types/character';
 import type { MapEncounter, NexusReward } from '@/types/campaign';
 import type { CampaignPackage } from '@/types/campaign';
+import type { RiftProgress } from '@/lib/game-state-storage';
 import { applyActivity, canAffordMove, spendSlipstream, canAffordEncounter, spendForEncounter } from '@/engine/resources';
 import { applyEncounterReward, spendCurrency } from '@/engine/progression';
 import { getAdjacentHexIds } from '@/engine/hex-math';
 import { applyArtifactOnAcquisition, getConsumableEffect, lootDropToInventoryItem } from '@/engine/inventory';
+import { canAffordRiftStage, spendForRiftStage } from '@/engine/rift';
 import { loadGameState, saveGameState, getDefaultMapState } from '@/lib/game-state-storage';
 
 const DEFAULT_RESOURCES: CharacterResources = { slipstream: 5, strikes: 2, wards: 0, aether: 1 };
@@ -40,9 +42,12 @@ export interface GameStateHookResult {
   setClearedHexes: React.Dispatch<React.SetStateAction<Set<string>>>;
   justClearedHexId: string | null;
   setJustClearedHexId: React.Dispatch<React.SetStateAction<string | null>>;
+  riftProgress: RiftProgress;
+  setRiftProgress: React.Dispatch<React.SetStateAction<RiftProgress>>;
   logWorkout: (type: ActivityType) => void;
   movePlayer: (q: number, r: number, id: string) => void;
   engageEncounter: (hexId: string, encounter: MapEncounter) => void;
+  attemptRiftStage: (hexId: string, riftId: string, stageIndex: number) => boolean;
   useConsumable: (item: InventoryItem, choice?: 'haste' | 'flow') => void;
   purchaseReward: (reward: NexusReward) => void;
 }
@@ -83,6 +88,10 @@ export function useGameState({ cols, rows, campaign }: GameStateHookParams): Gam
     return loaded?.mapState ? new Set(loaded.mapState.clearedHexes) : new Set(defaultMap.clearedHexes);
   });
   const [justClearedHexId, setJustClearedHexId] = useState<string | null>(null);
+  const [riftProgress, setRiftProgress] = useState<RiftProgress>(() => {
+    const loaded = loadGameState(cols, rows);
+    return loaded?.mapState?.riftProgress ?? {};
+  });
 
   const setCharacter = useCallback(
     (next: Character | null) => {
@@ -93,6 +102,7 @@ export function useGameState({ cols, rows, campaign }: GameStateHookParams): Gam
           setPlayerPos(def.playerPos);
           setRevealedHexes(new Set(def.revealedHexes));
           setClearedHexes(new Set(def.clearedHexes));
+          setRiftProgress(def.riftProgress ?? {});
           setResources(next.resources);
           setProgression(next.progression);
           setInventory(next.inventory ?? []);
@@ -219,6 +229,40 @@ export function useGameState({ cols, rows, campaign }: GameStateHookParams): Gam
     });
   }, []);
 
+  const attemptRiftStage = useCallback(
+    (hexId: string, riftId: string, stageIndex: number): boolean => {
+      const rift = campaign.rifts?.find((r) => r.id === riftId);
+      if (!rift || !character || stageIndex < 0 || stageIndex >= rift.stages.length) return false;
+      const stage = rift.stages[stageIndex];
+      if (!canAffordRiftStage(resources, character.stats, stage)) return false;
+      const nextResources = spendForRiftStage(resources, stage);
+      if (nextResources === null) return false;
+      setResources(nextResources);
+      setRiftProgress((prev) => ({ ...prev, [riftId]: stageIndex + 1 }));
+      if (stageIndex + 1 === rift.stages.length) {
+        setClearedHexes((prev) => new Set(prev).add(hexId));
+        setJustClearedHexId(hexId);
+        if (rift.completion_xp != null && rift.completion_xp > 0) {
+          setProgression((prev) => applyEncounterReward(prev, 0, rift.completion_xp));
+        }
+        if (rift.completion_loot) {
+          const item = lootDropToInventoryItem(rift.completion_loot);
+          setInventory((prev) => [...prev, item]);
+          if (item.kind === 'artifact') {
+            const artifactItemId = item.id;
+            setCharacterState((prev) => {
+              if (!prev) return null;
+              const newStats = applyArtifactOnAcquisition(artifactItemId, prev.stats);
+              return newStats ? { ...prev, stats: newStats } : prev;
+            });
+          }
+        }
+      }
+      return true;
+    },
+    [campaign.rifts, character, resources]
+  );
+
   // Persist to localStorage whenever game state changes (character non-null)
   useEffect(() => {
     if (!character) return;
@@ -233,9 +277,10 @@ export function useGameState({ cols, rows, campaign }: GameStateHookParams): Gam
         playerPos,
         revealedHexes: Array.from(revealedHexes),
         clearedHexes: Array.from(clearedHexes),
+        riftProgress,
       },
     });
-  }, [character, resources, progression, inventory, playerPos, revealedHexes, clearedHexes]);
+  }, [character, resources, progression, inventory, playerPos, revealedHexes, clearedHexes, riftProgress]);
 
   return {
     character,
@@ -254,9 +299,12 @@ export function useGameState({ cols, rows, campaign }: GameStateHookParams): Gam
     setClearedHexes,
     justClearedHexId,
     setJustClearedHexId,
+    riftProgress,
+    setRiftProgress,
     logWorkout,
     movePlayer,
     engageEncounter,
+    attemptRiftStage,
     useConsumable,
     purchaseReward,
   };

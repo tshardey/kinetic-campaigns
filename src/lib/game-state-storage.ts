@@ -10,10 +10,15 @@ import { getAdjacentHexIds } from '@/engine/hex-math';
 const GAME_STATE_KEY = 'kinetic-campaigns-game-state';
 const LEGACY_CHARACTER_KEY = 'kinetic-campaigns-character';
 
+/** Progress per rift: riftId -> completed stage index (0 = none, 1 = stage 0 done, … stages.length = fully complete). */
+export type RiftProgress = Record<string, number>;
+
 export interface MapState {
   playerPos: { q: number; r: number };
   revealedHexes: string[];
   clearedHexes: string[];
+  /** Narrative rift progress (realm-specific). */
+  riftProgress?: RiftProgress;
 }
 
 export interface PersistedGameState {
@@ -30,6 +35,7 @@ export function getDefaultMapState(cols: number, rows: number): MapState {
     playerPos: { q, r },
     revealedHexes: Array.from(revealed),
     clearedHexes: [],
+    riftProgress: {},
   };
 }
 

@@ -58,11 +58,22 @@ export interface DimensionalAnomaly {
   lore_text?: string;
 }
 
-/** A single stage of a narrative rift with a stat check. */
+/** Resource cost for a rift stage (earned by logging activities: Strength→Strikes, Cardio→Slipstream, Yoga→Wards). */
+export interface RiftStageCost {
+  resource: AnomalyResourceType;
+  amount: number;
+}
+
+/** A single stage of a narrative rift. Requires resource cost(s) (activity-based) or legacy stat check. */
 export interface NarrativeRiftStage {
   id: string;
   name: string;
-  required_stat: string;
+  /** Multiple resource costs to attempt (e.g. 2 Strikes, or 1 Strike + 1 Slipstream). When set, used instead of cost/required_stat. */
+  costs?: RiftStageCost[];
+  /** Optional: single resource cost (legacy). Ignored when costs is set. */
+  cost?: RiftStageCost;
+  /** Legacy: stat required to pass (e.g. Brawn ≥ 1). Ignored when cost/costs is set. */
+  required_stat?: string;
   description: string;
   image_url?: string;
 }
@@ -73,6 +84,10 @@ export interface NarrativeRift {
   description: string;
   image_url?: string;
   stages: NarrativeRiftStage[];
+  /** XP granted on full completion. */
+  completion_xp?: number;
+  /** Themed artifact/loot on completion. */
+  completion_loot?: EncounterLootDrop;
 }
 
 export interface CampaignPackage {

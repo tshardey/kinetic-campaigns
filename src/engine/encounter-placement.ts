@@ -4,7 +4,7 @@
  */
 
 import type { HexCell } from '@/types/hex';
-import type { CampaignPackage, MapEncounter, Encounter, DimensionalAnomaly } from '@/types/campaign';
+import type { CampaignPackage, MapEncounter, Encounter, DimensionalAnomaly, NarrativeRift } from '@/types/campaign';
 import { axialToOffset } from './hex-math';
 
 /** Seeded RNG: returns next float in [0, 1). */
@@ -41,6 +41,8 @@ export interface PlacementConfig {
   seed: number;
   /** Optional hex id where the player starts (no encounter placed here). */
   startHexId?: string;
+  /** Optional hex ids that must stay empty (e.g. narrative rift entrances). */
+  excludedHexIds?: Set<string>;
   /** Number of basic encounters to place (default from campaign). */
   numBasics?: number;
   /** Number of anomalies to place (default 3). */
@@ -56,11 +58,12 @@ export function placeEncounters(
   config: PlacementConfig,
   campaign: CampaignPackage
 ): Record<string, MapEncounter> {
-  const { grid, cols, seed, startHexId, numBasics = 18, numAnomalies = 3 } = config;
+  const { grid, cols, seed, startHexId, excludedHexIds, numBasics = 18, numAnomalies = 3 } = config;
   const rng = createSeededRng(seed);
   const result: Record<string, MapEncounter> = {};
 
   const startSet = startHexId ? new Set([startHexId]) : new Set<string>();
+  if (excludedHexIds) excludedHexIds.forEach((id) => startSet.add(id));
 
   type HexWithCol = { hex: HexCell; col: number };
   const withCol: HexWithCol[] = grid.map((hex) => ({
@@ -155,4 +158,36 @@ export function getDefaultStartHexId(_cols: number, rows: number): string {
   const r = centerRow;
   const q = col - (r - (r & 1)) / 2;
   return `${q},${r}`;
+}
+
+/**
+ * Place narrative rifts on the grid. One rift per campaign, at a mid-right hex (not start, not boss).
+ * Returns hexId -> riftId. Uses same seed as encounter placement for stability.
+ */
+export function placeRifts(
+  config: Pick<PlacementConfig, 'grid' | 'cols' | 'rows' | 'seed' | 'startHexId'>,
+  campaign: CampaignPackage
+): Record<string, string> {
+  const rifts = campaign.rifts ?? [];
+  if (rifts.length === 0) return {};
+  const { grid, cols, seed, startHexId } = config;
+  const rng = createSeededRng(seed + 9999);
+  const result: Record<string, string> = {};
+  const startSet = startHexId ? new Set([startHexId]) : new Set<string>();
+  type HexWithCol = { hex: HexCell; col: number };
+  const withCol: HexWithCol[] = grid.map((hex) => ({
+    hex,
+    col: axialToOffset(hex.q, hex.r).col,
+  }));
+  const midLeft = Math.max(2, Math.floor(cols / 2) - 1);
+  const midRight = Math.min(cols - 3, Math.floor(cols / 2) + 2);
+  const candidateHexes = withCol
+    .filter(({ hex, col }) => col >= midLeft && col <= midRight && !startSet.has(hex.id))
+    .map(({ hex }) => hex);
+  const [riftHex] = pickN([...candidateHexes], 1, rng);
+  if (riftHex) {
+    const rift = rifts[Math.floor(rng() * rifts.length)] as NarrativeRift;
+    result[riftHex.id] = rift.id;
+  }
+  return result;
 }

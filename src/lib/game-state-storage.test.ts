@@ -73,6 +73,11 @@ describe('game-state-storage', () => {
       expect(map.clearedHexes).toEqual([]);
     });
 
+    it('returns empty riftProgress', () => {
+      const map = getDefaultMapState(COLS, ROWS);
+      expect(map.riftProgress).toEqual({});
+    });
+
     it('returns different playerPos for different grid sizes', () => {
       const map14x9 = getDefaultMapState(14, 9);
       const map8x6 = getDefaultMapState(8, 6);

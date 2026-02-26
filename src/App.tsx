@@ -19,7 +19,7 @@ const MOCK_NEXUS_REWARDS: NexusReward[] = [
 
 function App() {
   const campaignState = useCampaign();
-  const { cols, rows, campaign, placedEncounters } = campaignState;
+  const { cols, rows, campaign, placedEncounters, placedRifts } = campaignState;
 
   const {
     character,
@@ -32,9 +32,11 @@ function App() {
     clearedHexes,
     justClearedHexId,
     setJustClearedHexId,
+    riftProgress,
     logWorkout,
     movePlayer,
     engageEncounter,
+    attemptRiftStage,
     useConsumable,
     purchaseReward,
   } = useGameState({ cols, rows, campaign });
@@ -95,11 +97,15 @@ function App() {
               clearedHexes={clearedHexes}
               justClearedHexId={justClearedHexId}
               encounters={placedEncounters}
+              placedRifts={placedRifts}
+              riftProgress={riftProgress}
               campaign={campaign}
+              character={character}
               lootFrameUrl={campaign.realm.loot_frame_url}
               resources={resources}
               onMove={movePlayer}
               onEngageEncounter={engageEncounter}
+              onAttemptRiftStage={attemptRiftStage}
               onContinueFromVictory={() => setJustClearedHexId(null)}
             />
           )}

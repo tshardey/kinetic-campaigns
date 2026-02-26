@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { generateRectGrid } from './hex-math';
-import { placeEncounters, getDefaultStartHexId } from './encounter-placement';
+import { placeEncounters, placeRifts, getDefaultStartHexId } from './encounter-placement';
 import type { CampaignPackage } from '@/types/campaign';
 
 const minimalCampaign: CampaignPackage = {
@@ -141,5 +141,62 @@ describe('placeEncounters', () => {
         expect('strikes' in enc && 'gold' in enc).toBe(true);
       }
     }
+  });
+});
+
+describe('placeRifts', () => {
+  const cols = 14;
+  const rows = 9;
+  const grid = generateRectGrid(cols, rows);
+  const startHexId = getDefaultStartHexId(cols, rows);
+
+  it('returns empty when campaign has no rifts', () => {
+    const result = placeRifts(
+      { grid, cols, rows, seed: 42, startHexId },
+      minimalCampaign
+    );
+    expect(Object.keys(result)).toHaveLength(0);
+  });
+
+  it('places exactly one rift hex when campaign has rifts', () => {
+    const campaignWithRift: CampaignPackage = {
+      ...minimalCampaign,
+      rifts: [
+        {
+          id: 'test-rift',
+          name: 'Test Rift',
+          description: 'A rift.',
+          stages: [
+            { id: 's1', name: 'S1', description: '', cost: { resource: 'strikes', amount: 1 } },
+          ],
+        },
+      ],
+    };
+    const result = placeRifts(
+      { grid, cols, rows, seed: 42, startHexId },
+      campaignWithRift
+    );
+    expect(Object.keys(result)).toHaveLength(1);
+    const [hexId] = Object.keys(result);
+    expect(result[hexId]).toBe('test-rift');
+    expect(grid.some((h) => h.id === hexId)).toBe(true);
+  });
+
+  it('returns same rift hex for same seed', () => {
+    const campaignWithRift: CampaignPackage = {
+      ...minimalCampaign,
+      rifts: [
+        {
+          id: 'r',
+          name: 'R',
+          description: 'R',
+          stages: [{ id: 's1', name: 'S1', description: '' }],
+        },
+      ],
+    };
+    const a = placeRifts({ grid, cols, rows, seed: 100, startHexId }, campaignWithRift);
+    const b = placeRifts({ grid, cols, rows, seed: 100, startHexId }, campaignWithRift);
+    expect(Object.keys(a)).toEqual(Object.keys(b));
+    expect(Object.values(a)).toEqual(Object.values(b));
   });
 });

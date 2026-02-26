@@ -260,4 +260,88 @@ describe('useGameState', () => {
       expect(result.current.resources.wards).toBe(1);
     });
   });
+
+  describe('attemptRiftStage', () => {
+    it('spends resource cost and advances rift progress when affordable', () => {
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+
+      act(() => {
+        result.current.setCharacter(validCharacter);
+      });
+
+      const hexId = '3,4';
+      const riftId = 'moon-cats-vigil';
+      expect(result.current.resources.strikes).toBe(2);
+      expect(result.current.riftProgress[riftId]).toBeUndefined();
+
+      act(() => {
+        result.current.attemptRiftStage(hexId, riftId, 0);
+      });
+
+      expect(result.current.resources.strikes).toBe(0);
+      expect(result.current.riftProgress[riftId]).toBe(1);
+    });
+
+    it('returns false and does not advance when cannot afford', () => {
+      const charNoStrikes = {
+        ...validCharacter,
+        resources: { ...validCharacter.resources, strikes: 0 },
+      };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+
+      act(() => {
+        result.current.setCharacter(charNoStrikes);
+      });
+
+      const hexId = '3,4';
+      const riftId = 'moon-cats-vigil';
+      let attemptResult: boolean = false;
+      act(() => {
+        attemptResult = result.current.attemptRiftStage(hexId, riftId, 0);
+      });
+
+      expect(attemptResult).toBe(false);
+      expect(result.current.riftProgress[riftId]).toBeUndefined();
+      expect(result.current.resources.strikes).toBe(0);
+    });
+
+    it('on full rift completion adds completion loot and applies artifact Focus buff', () => {
+      const charWithWards = {
+        ...validCharacter,
+        resources: { slipstream: 5, strikes: 3, wards: 1, aether: 1 },
+        stats: { ...validCharacter.stats, focus: 0 },
+      };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+
+      act(() => {
+        result.current.setCharacter(charWithWards);
+      });
+
+      const hexId = '3,4';
+      const riftId = 'moon-cats-vigil';
+      const initialFocus = result.current.character!.stats.focus;
+
+      act(() => {
+        result.current.attemptRiftStage(hexId, riftId, 0);
+      });
+      act(() => {
+        result.current.attemptRiftStage(hexId, riftId, 1);
+      });
+      act(() => {
+        result.current.attemptRiftStage(hexId, riftId, 2);
+      });
+
+      expect(result.current.riftProgress[riftId]).toBe(3);
+      const moonCat = result.current.inventory.find((i) => i.id === 'moon-cat-coin');
+      expect(moonCat).toBeDefined();
+      expect(moonCat!.kind).toBe('artifact');
+      expect(result.current.character!.stats.focus).toBe(initialFocus + 1);
+    });
+  });
 });

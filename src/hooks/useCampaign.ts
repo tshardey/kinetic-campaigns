@@ -8,7 +8,7 @@ import type { CampaignPackage } from '@/types/campaign';
 import type { HexCell } from '@/types/hex';
 import type { MapEncounter } from '@/types/campaign';
 import { generateRectGrid } from '@/engine/hex-math';
-import { placeEncounters, getDefaultStartHexId } from '@/engine/encounter-placement';
+import { placeEncounters, placeRifts, getDefaultStartHexId } from '@/engine/encounter-placement';
 import { omijaCampaign } from '@/data/omija';
 
 const PLACEMENT_SEED = 42;
@@ -17,6 +17,8 @@ export interface CampaignState {
   campaign: CampaignPackage;
   grid: HexCell[];
   placedEncounters: Record<string, MapEncounter>;
+  /** Hex id -> rift id (narrative rift entrance hexes). */
+  placedRifts: Record<string, string>;
   startHexId: string;
   cols: number;
   rows: number;
@@ -34,14 +36,26 @@ export function useCampaign(): CampaignState {
     const rows = campaign.realm.grid_rows ?? 9;
     const grid = generateRectGrid(cols, rows);
     const startHexId = getDefaultStartHexId(cols, rows);
-    const placedEncounters = placeEncounters(
+    const placedRifts = placeRifts(
       { grid, cols, rows, seed: PLACEMENT_SEED, startHexId },
+      campaign
+    );
+    const placedEncounters = placeEncounters(
+      {
+        grid,
+        cols,
+        rows,
+        seed: PLACEMENT_SEED,
+        startHexId,
+        excludedHexIds: new Set(Object.keys(placedRifts)),
+      },
       campaign
     );
     return {
       campaign,
       grid,
       placedEncounters,
+      placedRifts,
       startHexId,
       cols,
       rows,

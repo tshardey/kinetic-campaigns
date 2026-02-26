@@ -12,6 +12,8 @@ interface HexTileProps {
   isPlayerHere: boolean;
   encounter: MapEncounter | undefined;
   isCleared: boolean;
+  /** True when this hex is a narrative rift entrance (show rift marker when revealed). */
+  isRiftHex?: boolean;
   onMove: (q: number, r: number, id: string) => void;
 }
 
@@ -32,6 +34,7 @@ export function HexTile({
   isPlayerHere,
   encounter,
   isCleared,
+  isRiftHex = false,
   onMove,
 }: HexTileProps) {
   // Unrevealed: opaque fog of war. Revealed: transparent so underlying map shows through.
@@ -42,7 +45,9 @@ export function HexTile({
     fillOpacity = 0.35;
     fill = '#334155';
     stroke = 'rgba(71, 85, 105, 0.9)';
-    if (encounter && !isCleared) {
+    if (isRiftHex && !isCleared) {
+      fill = '#4c1d95'; // violet: narrative rift
+    } else if (encounter && !isCleared) {
       if (encounter.type === 'basic') fill = '#713f12';
       if (encounter.type === 'elite') fill = '#7f1d1d';
       if (encounter.type === 'boss') fill = '#4c1d95';
@@ -65,7 +70,19 @@ export function HexTile({
         className={`transition-all duration-300 ${canClick ? 'cursor-pointer hover:opacity-80' : ''}`}
         onClick={() => canClick && onMove(hex.q, hex.r, hex.id)}
       />
-      {isRevealed && encounter && !isCleared && (
+      {isRevealed && isRiftHex && !isCleared && (
+        <text
+          x="0"
+          y="5"
+          textAnchor="middle"
+          fill="white"
+          fontSize="16"
+          pointerEvents="none"
+        >
+          🌙
+        </text>
+      )}
+      {isRevealed && !isRiftHex && encounter && !isCleared && (
         <text
           x="0"
           y="5"

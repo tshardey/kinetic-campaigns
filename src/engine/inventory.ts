@@ -24,6 +24,9 @@ export function applyArtifactOnAcquisition(
   if (itemId === 'talon-of-the-west-wind') {
     return { ...currentStats, haste: currentStats.haste + 1 };
   }
+  if (itemId === 'moon-cat-coin') {
+    return { ...currentStats, focus: currentStats.focus + 1 };
+  }
   return null;
 }
 

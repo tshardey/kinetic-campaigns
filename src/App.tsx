@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Map as MapIcon, Tent } from 'lucide-react';
-import type { Character, CharacterResources, Progression } from '@/types/character';
+import type { Character, CharacterResources, Progression, InventoryItem } from '@/types/character';
 import type { ActivityType } from '@/types/character';
 import type { MapEncounter, NexusReward } from '@/types/campaign';
 import { applyActivity, canAffordMove, spendSlipstream, canAffordEncounter, spendForEncounter } from '@/engine/resources';
 import { applyEncounterReward, spendCurrency } from '@/engine/progression';
 import { getAdjacentHexIds, generateRectGrid } from '@/engine/hex-math';
 import { placeEncounters, getDefaultStartHexId } from '@/engine/encounter-placement';
-import { loadCharacter } from '@/lib/character-storage';
+import { applyArtifactOnAcquisition, getConsumableEffect, lootDropToInventoryItem } from '@/engine/inventory';
+import { loadCharacter, saveCharacter } from '@/lib/character-storage';
 import { CharacterPanel } from '@/components/sidebar/CharacterPanel';
 import { CharacterCreation } from '@/components/character-creation/CharacterCreation';
 import { HexGrid } from '@/components/hex-grid/HexGrid';
@@ -47,6 +48,7 @@ function getInitialState(character: Character | null) {
   return {
     resources: character?.resources ?? DEFAULT_RESOURCES,
     progression: character?.progression ?? DEFAULT_PROGRESSION,
+    inventory: character?.inventory ?? [],
   };
 }
 
@@ -56,6 +58,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<'map' | 'nexus'>('map');
   const [resources, setResources] = useState(initialState.resources);
   const [progression, setProgression] = useState(initialState.progression);
+  const [inventory, setInventory] = useState<InventoryItem[]>(initialState.inventory);
   const [playerPos, setPlayerPos] = useState({ q: startQ, r: startR });
   const [revealedHexes, setRevealedHexes] = useState(INITIAL_REVEALED);
   const [clearedHexes, setClearedHexes] = useState(new Set<string>([]));
@@ -65,6 +68,7 @@ function App() {
     if (character) {
       setResources(character.resources);
       setProgression(character.progression);
+      setInventory(character.inventory ?? []);
     }
   }, [character]);
 
@@ -111,8 +115,69 @@ function App() {
     const xpGain = encounter.type === 'elite' ? 1 : encounter.type === 'boss' ? 3 : 0;
     setClearedHexes((prev) => new Set(prev).add(hexId));
     setProgression((prev) => applyEncounterReward(prev, encounter.gold, xpGain));
+
+    // Add loot to inventory (resolve full encounter for loot_drop)
+    if (encounter.type !== 'anomaly' && encounter.id) {
+      const fullEncounter = omijaCampaign.encounters.find(
+        (e) => e.id === encounter.id || (e.name === encounter.name && e.type === encounter.type)
+      );
+      if (fullEncounter?.loot_drop) {
+        const item = lootDropToInventoryItem(fullEncounter.loot_drop);
+        setInventory((prev) => [...prev, item]);
+        if (item.kind === 'artifact' && character) {
+          const newStats = applyArtifactOnAcquisition(item.id, character.stats);
+          if (newStats) setCharacter((prev) => (prev ? { ...prev, stats: newStats } : null));
+        }
+      }
+    }
     setJustClearedHexId(hexId);
   };
+
+  const useConsumable = useCallback(
+    (item: InventoryItem, choice?: 'haste' | 'flow') => {
+      if (item.kind !== 'consumable') return;
+      const effect = getConsumableEffect(item.id, choice);
+      if (!effect) return;
+      setInventory((prev) => {
+        const idx = prev.findIndex((i) => i.id === item.id);
+        if (idx === -1) return prev;
+        const next = [...prev];
+        next.splice(idx, 1);
+        return next;
+      });
+      if (effect.addStrikes) {
+        setResources((r) => ({ ...r, strikes: r.strikes + effect.addStrikes! }));
+      }
+      if (effect.addSlipstream) {
+        setResources((r) => ({ ...r, slipstream: r.slipstream + effect.addSlipstream! }));
+      }
+      if (effect.statDelta) {
+        setCharacter((prev) => {
+          if (!prev) return null;
+          const newStats = { ...prev.stats };
+          if (effect.statDelta!.haste) newStats.haste += effect.statDelta!.haste;
+          if (effect.statDelta!.flow) newStats.flow += effect.statDelta!.flow;
+          if (effect.statDelta!.brawn) newStats.brawn += effect.statDelta!.brawn;
+          if (effect.statDelta!.focus) newStats.focus += effect.statDelta!.focus;
+          return { ...prev, stats: newStats };
+        });
+      }
+      if (effect.parasolShieldActive !== undefined) {
+        setCharacter((prev) => (prev ? { ...prev, parasolShieldActive: effect.parasolShieldActive } : null));
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!character) return;
+    saveCharacter({
+      ...character,
+      resources,
+      progression,
+      inventory,
+    });
+  }, [character, resources, progression, inventory]);
 
   const purchaseReward = (reward: NexusReward) => {
     const next = spendCurrency(progression, reward.cost);
@@ -131,7 +196,9 @@ function App() {
         character={character}
         progression={progression}
         resources={resources}
+        inventory={inventory}
         onLogActivity={logWorkout}
+        onUseConsumable={useConsumable}
       />
 
       <main className="flex-1 flex flex-col relative bg-slate-950 overflow-hidden">

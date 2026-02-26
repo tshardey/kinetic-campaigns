@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Sparkles, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
-import type { Character, CharacterResources, Progression } from '@/types/character';
+import { Sparkles, BookOpen, ChevronDown, ChevronUp, Package } from 'lucide-react';
+import type { Character, CharacterResources, Progression, InventoryItem } from '@/types/character';
 import type { ActivityType } from '@/types/character';
 import { getXpCap } from '@/engine/progression';
 import { getPlaybook } from '@/data/playbooks';
+import { consumableRequiresChoice } from '@/engine/inventory';
 import { ResourceDisplay } from './ResourceDisplay';
 import { ActivityLogger } from './ActivityLogger';
 
@@ -11,16 +12,22 @@ interface CharacterPanelProps {
   character: Character;
   progression: Progression;
   resources: CharacterResources;
+  inventory: InventoryItem[];
   onLogActivity: (type: ActivityType) => void;
+  onUseConsumable: (item: InventoryItem, choice?: 'haste' | 'flow') => void;
 }
 
 export function CharacterPanel({
   character,
   progression,
   resources,
+  inventory,
   onLogActivity,
+  onUseConsumable,
 }: CharacterPanelProps) {
   const [sheetExpanded, setSheetExpanded] = useState(true);
+  const [inventoryExpanded, setInventoryExpanded] = useState(true);
+  const [vialChoiceFor, setVialChoiceFor] = useState<string | null>(null);
   const xpCap = getXpCap(progression.level);
   const xpPercent = (progression.xp / xpCap) * 100;
   const playbook = getPlaybook(character.playbook);
@@ -106,6 +113,119 @@ export function CharacterPanel({
                   {startingMove.description}
                 </p>
               </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Inventory */}
+      <div className="border-b border-slate-800 bg-slate-800/30">
+        <button
+          type="button"
+          onClick={() => setInventoryExpanded((e) => !e)}
+          className="w-full p-4 flex items-center justify-between gap-2 text-left hover:bg-slate-800/50 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-inset rounded-none"
+          aria-expanded={inventoryExpanded}
+          aria-controls="inventory-content"
+          id="inventory-toggle"
+        >
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+            <Package className="w-3.5 h-3.5" /> Inventory
+            {(inventory?.length ?? 0) > 0 && (
+              <span className="bg-slate-600 text-slate-200 text-[10px] px-1.5 py-0.5 rounded">
+                {inventory?.length ?? 0}
+              </span>
+            )}
+          </span>
+          {inventoryExpanded ? (
+            <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" aria-hidden />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" aria-hidden />
+          )}
+        </button>
+        {inventoryExpanded && (
+          <div
+            id="inventory-content"
+            role="region"
+            aria-labelledby="inventory-toggle"
+            className="px-4 pb-4 max-h-64 overflow-y-auto"
+          >
+            {(inventory?.length ?? 0) === 0 ? (
+              <p className="text-xs text-slate-500 py-2">No items yet. Clear encounters for loot.</p>
+            ) : (
+              <ul className="space-y-2">
+                {(inventory ?? []).map((item, index) => (
+                  <li
+                    key={`${item.id}-${index}`}
+                    className="bg-slate-800 rounded-lg p-2 flex items-start gap-2"
+                  >
+                    {item.image_url && (
+                      <img
+                        src={item.image_url}
+                        alt=""
+                        className="w-10 h-10 object-contain shrink-0 rounded"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-white truncate">{item.name}</p>
+                      <p className="text-[10px] text-slate-500 uppercase">
+                        {item.kind === 'artifact' ? 'Artifact (buff applied)' : 'Consumable'}
+                      </p>
+                      {item.description && (
+                        <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">
+                          {item.description}
+                        </p>
+                      )}
+                      {item.kind === 'consumable' && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {vialChoiceFor === item.id ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onUseConsumable(item, 'haste');
+                                  setVialChoiceFor(null);
+                                }}
+                                className="text-xs bg-amber-600 hover:bg-amber-500 text-white px-2 py-1 rounded"
+                              >
+                                Restore Haste
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onUseConsumable(item, 'flow');
+                                  setVialChoiceFor(null);
+                                }}
+                                className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded"
+                              >
+                                Restore Flow
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setVialChoiceFor(null)}
+                                className="text-xs text-slate-400 hover:text-slate-300"
+                              >
+                                Cancel
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                consumableRequiresChoice(item.id)
+                                  ? setVialChoiceFor(item.id)
+                                  : onUseConsumable(item)
+                              }
+                              className="text-xs bg-teal-600 hover:bg-teal-500 text-white px-2 py-1 rounded"
+                            >
+                              Use
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         )}

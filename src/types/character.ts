@@ -41,6 +41,15 @@ export interface PlaybookDefinition {
   startingMoves: StartingMove[];
 }
 
+/** A single inventory item (from encounter loot). Consumables can be used; artifacts apply buffs on acquisition. */
+export interface InventoryItem {
+  id: string;
+  name: string;
+  kind: 'consumable' | 'artifact';
+  description?: string;
+  image_url?: string;
+}
+
 export interface Character {
   id?: string;
   name: string;
@@ -49,6 +58,10 @@ export interface Character {
   stats: CharacterStats;
   resources: CharacterResources;
   progression: Progression;
+  /** Loot collected from encounters. */
+  inventory?: InventoryItem[];
+  /** One-time shield from Iron-Silk Parasol (negates streak loss / missed workout penalty). */
+  parasolShieldActive?: boolean;
 }
 
 export type ActivityType = 'cardio' | 'strength' | 'yoga' | 'wellness';

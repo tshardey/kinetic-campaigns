@@ -1,11 +1,11 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { CharacterPanel } from './CharacterPanel';
-import type { Character } from '@/types/character';
+import type { Character, InventoryItem } from '@/types/character';
 
 const mockCharacter: Character = {
   name: 'Test Hero',
@@ -20,7 +20,9 @@ const defaultProps = {
   character: mockCharacter,
   progression: mockCharacter.progression,
   resources: mockCharacter.resources,
+  inventory: [] as InventoryItem[],
   onLogActivity: () => {},
+  onUseConsumable: () => {},
 };
 
 describe('CharacterPanel', () => {
@@ -59,6 +61,112 @@ describe('CharacterPanel', () => {
       expect(toggle).toHaveAttribute('aria-expanded', 'false');
       fireEvent.click(toggle);
       expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    });
+  });
+
+  describe('Inventory section', () => {
+    it('shows empty state when inventory is empty', () => {
+      render(<CharacterPanel {...defaultProps} />);
+      const inventoryToggle = screen.getByRole('button', { name: /inventory/i });
+      expect(inventoryToggle).toBeInTheDocument();
+      expect(screen.getByText(/no items yet/i)).toBeInTheDocument();
+    });
+
+    it('shows inventory items when present', () => {
+      const inventory: InventoryItem[] = [
+        {
+          id: 'memory-censer',
+          name: 'Memory Censer',
+          kind: 'consumable',
+          description: 'Use: Clears mental fog, granting 1 free Strike.',
+        },
+        {
+          id: 'talon-of-the-west-wind',
+          name: 'Talon of the West Wind',
+          kind: 'artifact',
+          description: 'Permanently buffs Haste.',
+        },
+      ];
+      render(<CharacterPanel {...defaultProps} inventory={inventory} />);
+      expect(screen.getByText('Memory Censer')).toBeInTheDocument();
+      expect(screen.getByText('Talon of the West Wind')).toBeInTheDocument();
+      expect(screen.getByText(/consumable/i)).toBeInTheDocument();
+      expect(screen.getByText(/artifact \(buff applied\)/i)).toBeInTheDocument();
+    });
+
+    it('shows Use button for consumables', () => {
+      const inventory: InventoryItem[] = [
+        { id: 'memory-censer', name: 'Memory Censer', kind: 'consumable' },
+      ];
+      render(<CharacterPanel {...defaultProps} inventory={inventory} />);
+      expect(screen.getByRole('button', { name: 'Use' })).toBeInTheDocument();
+    });
+
+    it('calls onUseConsumable when Use is clicked for simple consumable', () => {
+      const onUseConsumable = vi.fn();
+      const inventory: InventoryItem[] = [
+        { id: 'memory-censer', name: 'Memory Censer', kind: 'consumable' },
+      ];
+      render(
+        <CharacterPanel {...defaultProps} inventory={inventory} onUseConsumable={onUseConsumable} />
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Use' }));
+      expect(onUseConsumable).toHaveBeenCalledTimes(1);
+      expect(onUseConsumable).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'memory-censer', kind: 'consumable' })
+      );
+    });
+
+    it('shows Restore Haste and Restore Flow when Use is clicked for Vial of Sun-Catch', () => {
+      const inventory: InventoryItem[] = [
+        { id: 'vial-of-sun-catch', name: 'Vial of Sun-Catch', kind: 'consumable' },
+      ];
+      render(<CharacterPanel {...defaultProps} inventory={inventory} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Use' }));
+      expect(screen.getByRole('button', { name: 'Restore Haste' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Restore Flow' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    });
+
+    it('calls onUseConsumable with choice when Restore Haste is clicked for Vial', () => {
+      const onUseConsumable = vi.fn();
+      const inventory: InventoryItem[] = [
+        { id: 'vial-of-sun-catch', name: 'Vial of Sun-Catch', kind: 'consumable' },
+      ];
+      render(
+        <CharacterPanel {...defaultProps} inventory={inventory} onUseConsumable={onUseConsumable} />
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Use' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Restore Haste' }));
+      expect(onUseConsumable).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'vial-of-sun-catch' }),
+        'haste'
+      );
+    });
+
+    it('calls onUseConsumable with choice when Restore Flow is clicked for Vial', () => {
+      const onUseConsumable = vi.fn();
+      const inventory: InventoryItem[] = [
+        { id: 'vial-of-sun-catch', name: 'Vial of Sun-Catch', kind: 'consumable' },
+      ];
+      render(
+        <CharacterPanel {...defaultProps} inventory={inventory} onUseConsumable={onUseConsumable} />
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Use' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Restore Flow' }));
+      expect(onUseConsumable).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'vial-of-sun-catch' }),
+        'flow'
+      );
+    });
+
+    it('inventory toggle shows count badge when items present', () => {
+      const inventory: InventoryItem[] = [
+        { id: 'memory-censer', name: 'Memory Censer', kind: 'consumable' },
+      ];
+      render(<CharacterPanel {...defaultProps} inventory={inventory} />);
+      const inventoryToggle = screen.getByRole('button', { name: /inventory/i });
+      expect(within(inventoryToggle).getByText('1')).toBeInTheDocument();
     });
   });
 });

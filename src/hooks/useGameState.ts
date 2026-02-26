@@ -137,8 +137,10 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
   );
 
   const logWorkout = useCallback((type: ActivityType, durationMinutes?: number) => {
-    setResources((prev) => applyActivity(prev, type, durationMinutes));
-  }, []);
+    setResources((prev) =>
+      applyActivity(prev, type, durationMinutes, character ? { stats: character.stats, startingMoveId: character.startingMoveId } : undefined)
+    );
+  }, [character]);
 
   const movePlayer = useCallback(
     (q: number, r: number, id: string) => {

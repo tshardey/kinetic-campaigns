@@ -1,16 +1,17 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   canAffordEncounter,
   spendForEncounter,
   spendAether,
   spendWards,
   applyActivity,
+  calculateBoost,
   ACTIVITY_MINUTES_PER_UNIT,
   canAffordMove,
   spendSlipstream,
   spendStrikes,
 } from './resources';
-import type { CharacterResources } from '@/types/character';
+import type { CharacterResources, CharacterStats } from '@/types/character';
 
 const baseResources: CharacterResources = {
   slipstream: 5,
@@ -200,6 +201,39 @@ describe('applyActivity', () => {
     expect(applyActivity(baseResources, 'cardio', 39).slipstream).toBe(
       baseResources.slipstream + 1
     );
+  });
+  it('adds boost from stats when options provided', () => {
+    const stats: CharacterStats = { brawn: 2, flow: 0, haste: 1, focus: -1 };
+    vi.spyOn(Math, 'random').mockReturnValue(0.05); // 2 * 0.1 = 0.2 > 0.05 => +1 boost
+    const next = applyActivity(baseResources, 'strength', 15, { stats });
+    expect(next.strikes).toBe(baseResources.strikes + 1 + 1); // 1 unit + 1 boost
+    vi.restoreAllMocks();
+  });
+  it('momentum-strike intercept grants +1 Strike on strength', () => {
+    const stats: CharacterStats = { brawn: 0, flow: 0, haste: 0, focus: 0 };
+    const next = applyActivity(baseResources, 'strength', 15, { stats, startingMoveId: 'momentum-strike' });
+    expect(next.strikes).toBe(baseResources.strikes + 1 + 1); // 1 unit + intercept
+  });
+  it('aether-cascade intercept grants +1 Aether on yoga when roll < 0.5', () => {
+    const stats: CharacterStats = { brawn: 0, flow: 0, haste: 0, focus: 0 };
+    vi.spyOn(Math, 'random').mockReturnValue(0.3);
+    const next = applyActivity(baseResources, 'yoga', 20, { stats, startingMoveId: 'aether-cascade' });
+    expect(next.wards).toBe(baseResources.wards + 1);
+    expect(next.aether).toBe(baseResources.aether + 1);
+    vi.restoreAllMocks();
+  });
+});
+
+describe('calculateBoost', () => {
+  it('returns 1 when (statValue * 0.10) > Math.random()', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.05);
+    expect(calculateBoost(2)).toBe(1);
+    vi.restoreAllMocks();
+  });
+  it('returns 0 when (statValue * 0.10) <= Math.random()', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    expect(calculateBoost(2)).toBe(0);
+    vi.restoreAllMocks();
   });
 });
 

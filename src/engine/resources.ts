@@ -3,8 +3,29 @@
  * Anomalies always cost aether + one other resource (strikes, wards, or slipstream).
  */
 
-import type { CharacterResources, ActivityType } from '@/types/character';
+import type { CharacterResources, CharacterStats, ActivityType } from '@/types/character';
 import type { AnomalyResourceType } from '@/types/campaign';
+
+/** Options for applyActivity: stats enable the boost mechanic; startingMoveId enables playbook intercepts. */
+export interface ApplyActivityOptions {
+  stats: CharacterStats;
+  startingMoveId?: string;
+}
+
+/** Stat mapped to each activity for the boost roll: Strength->Brawn, Cardio->Haste, Yoga->Flow, Wellness->Focus. */
+const ACTIVITY_STAT: Record<ActivityType, keyof CharacterStats> = {
+  strength: 'brawn',
+  cardio: 'haste',
+  yoga: 'flow',
+  wellness: 'focus',
+};
+
+/**
+ * Boost roll: (statValue * 0.10) > Math.random() grants 1 extra resource, else 0.
+ */
+export function calculateBoost(statValue: number): number {
+  return (statValue * 0.1) > Math.random() ? 1 : 0;
+}
 
 /** Encounter cost shape used for affordability and spending. */
 export interface EncounterCost {
@@ -29,11 +50,14 @@ export const ACTIVITY_MINUTES_PER_UNIT: Record<ActivityType, number> = {
  * Apply a logged activity and return updated resources.
  * When durationMinutes is provided, grants units by floor(durationMinutes / threshold) (e.g. 20 min cardio = 1 Slipstream).
  * When omitted, grants 1 unit (quick log). Under threshold grants 0.
+ * When options.stats is provided, adds a boost roll (stat * 0.10 > random) per unit for the mapped stat (Strength->Brawn, Cardio->Haste, Yoga->Flow, Wellness->Focus).
+ * Playbook intercepts: Momentum Strike (strength) +1 Strike; Aether Cascade (yoga) 50% +1 Aether.
  */
 export function applyActivity(
   current: CharacterResources,
   activity: ActivityType,
-  durationMinutes?: number
+  durationMinutes?: number,
+  options?: ApplyActivityOptions
 ): CharacterResources {
   const next = { ...current };
   const units =
@@ -41,20 +65,39 @@ export function applyActivity(
       ? Math.floor(durationMinutes / ACTIVITY_MINUTES_PER_UNIT[activity])
       : 1;
   if (units < 1) return next;
+
+  const statKey = options?.stats ? ACTIVITY_STAT[activity] : null;
+  const statValue = statKey != null ? options!.stats[statKey] ?? 0 : 0;
+  let boostTotal = 0;
+  if (options?.stats && statKey != null) {
+    for (let i = 0; i < units; i++) {
+      boostTotal += calculateBoost(statValue);
+    }
+  }
+
   switch (activity) {
     case 'cardio':
-      next.slipstream += units;
+      next.slipstream += units + boostTotal;
       break;
     case 'strength':
-      next.strikes += units;
+      next.strikes += units + boostTotal;
       break;
     case 'yoga':
-      next.wards += units;
+      next.wards += units + boostTotal;
       break;
     case 'wellness':
-      next.aether += units;
+      next.aether += units + boostTotal;
       break;
   }
+
+  // Playbook intercepts
+  if (options?.startingMoveId === 'momentum-strike' && activity === 'strength') {
+    next.strikes += 1;
+  }
+  if (options?.startingMoveId === 'aether-cascade' && activity === 'yoga' && Math.random() < 0.5) {
+    next.aether += 1;
+  }
+
   return next;
 }
 

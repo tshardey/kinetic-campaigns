@@ -135,7 +135,8 @@ describe('useGameState', () => {
     act(() => {
       result.current.logWorkout('strength');
     });
-    expect(result.current.resources.strikes).toBe(strikesBefore + 1);
+    // validCharacter has momentum-strike: base +1 Strike + intercept +1 = +2
+    expect(result.current.resources.strikes).toBe(strikesBefore + 2);
   });
 
   it('logWorkout with durationMinutes grants scaled units', () => {

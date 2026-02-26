@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, BookOpen, ChevronDown, ChevronUp, Package, X, Heart } from 'lucide-react';
+import { Sparkles, BookOpen, ChevronDown, ChevronUp, Package, X } from 'lucide-react';
 import type { Character, CharacterResources, Progression, InventoryItem } from '@/types/character';
 import type { ActivityType } from '@/types/character';
 import { getXpCap } from '@/engine/progression';
@@ -45,14 +45,6 @@ export function CharacterPanel({
           </h1>
           <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
             {character.name || 'The Worldhopper'}
-          </p>
-          <p className="mt-2 flex items-center" title="Hit points">
-            <span className="relative inline-flex items-center justify-center">
-              <Heart className="w-[2.875rem] h-[2.875rem] text-rose-400" aria-hidden />
-              <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold tabular-nums text-white">
-                {character.hp ?? character.maxHp ?? 5}
-              </span>
-            </span>
           </p>
         </div>
         {onCloseSidebar && (
@@ -126,11 +118,19 @@ export function CharacterPanel({
                 );
               })}
             </div>
-            <div className="pt-1 border-t border-slate-700">
-              <p className="text-[10px] uppercase text-slate-500 font-medium mb-0.5">Max HP</p>
-              <p className="text-sm font-bold tabular-nums text-white">
-                {character.maxHp ?? 5}
-              </p>
+            <div className="pt-1 border-t border-slate-700 grid grid-cols-2 gap-2">
+              <div>
+                <p className="text-[10px] uppercase text-slate-500 font-medium mb-0.5">Current HP</p>
+                <p className="text-sm font-bold tabular-nums text-white">
+                  {character.hp ?? character.maxHp ?? 5}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase text-slate-500 font-medium mb-0.5">Max HP</p>
+                <p className="text-sm font-bold tabular-nums text-white">
+                  {character.maxHp ?? 5}
+                </p>
+              </div>
             </div>
             {startingMove && (
               <div className="pt-1 border-t border-slate-700">

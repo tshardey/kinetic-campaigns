@@ -97,6 +97,7 @@ function App() {
               encounters={placedEncounters}
               campaign={campaign}
               lootFrameUrl={campaign.realm.loot_frame_url}
+              resources={resources}
               onMove={movePlayer}
               onEngageEncounter={engageEncounter}
               onContinueFromVictory={() => setJustClearedHexId(null)}

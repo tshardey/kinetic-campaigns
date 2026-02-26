@@ -4,6 +4,8 @@ import type {
   Encounter,
   DimensionalAnomaly,
 } from '@/types/campaign';
+import type { CharacterResources } from '@/types/character';
+import { canAffordEncounter } from '@/engine/resources';
 
 function getFullEncounter(
   encounter: MapEncounter,
@@ -43,6 +45,7 @@ interface EncounterPanelProps {
   campaign: CampaignPackage | null;
   lootFrameUrl: string;
   isVictory: boolean;
+  resources?: CharacterResources;
   onEngage: () => void;
   onContinue: () => void;
 }
@@ -52,11 +55,13 @@ export function EncounterPanel({
   campaign,
   lootFrameUrl,
   isVictory,
+  resources,
   onEngage,
   onContinue,
 }: EncounterPanelProps) {
   const full = getFullEncounter(encounter, campaign);
   const isCombat = full && 'strikes' in full;
+  const isAnomaly = encounter.type === 'anomaly';
   const imageUrl =
     full && 'image_url' in full && full.image_url ? full.image_url : undefined;
   const lootDrop =
@@ -66,11 +71,20 @@ export function EncounterPanel({
     encounter.type === 'elite' ? 1 : encounter.type === 'boss' ? 3 : 0;
   const tierLabel = getTierLabel(encounter.type);
   const tierStyles = getTierStyles(encounter.type);
+  const anomalyLore = isAnomaly && full && 'lore_text' in full ? (full as DimensionalAnomaly).lore_text : undefined;
+
+  const costShape = isAnomaly
+    ? { type: 'anomaly' as const, cost: encounter.cost, resource: encounter.resource, resource_amount: encounter.resource_amount }
+    : { type: encounter.type, strikes: encounter.strikes };
+  const canAfford = resources && canAffordEncounter(resources, costShape);
+  const resourceLabel = isAnomaly
+    ? (encounter.resource === 'strikes' ? 'Strike(s)' : encounter.resource === 'wards' ? 'Ward(s)' : 'Slipstream')
+    : '';
 
   if (isVictory) {
     return (
       <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 bg-slate-800/95 border border-slate-600 p-6 rounded-2xl shadow-2xl w-[28rem] max-w-[95vw] text-center animate-in slide-in-from-bottom-10 fade-in">
-        {/* Loot frame + item only when there is a loot drop */}
+        {/* Loot frame + item only when there is a loot drop (combat only) */}
         {lootDrop && (
           <div className="flex justify-center mb-4">
             <div className="relative inline-block w-32 h-32">
@@ -101,6 +115,11 @@ export function EncounterPanel({
             <span className="text-indigo-300 font-medium">+{xpEarned} XP</span>
           )}
         </div>
+        {anomalyLore && (
+          <div className="bg-sky-900/30 border border-sky-600/50 rounded-xl p-3 mb-4 text-left">
+            <p className="text-sky-200 text-sm italic">&ldquo;{anomalyLore}&rdquo;</p>
+          </div>
+        )}
         {lootDrop && (
           <div className="bg-slate-700/60 rounded-xl p-3 mb-4 text-left">
             <p className="text-slate-200 font-medium text-sm">{lootDrop.name}</p>
@@ -149,10 +168,21 @@ export function EncounterPanel({
         {/* Requirements */}
         <div className="mb-4">
           {encounter.type === 'anomaly' ? (
-            <p className="text-slate-200 text-sm">
-              Requires <strong>{encounter.cost} Aether</strong> and{' '}
-              <strong>{encounter.stat}</strong> to clear.
-            </p>
+            <div className="space-y-2">
+              <p className="text-slate-200 text-sm">
+                Dimensional anomaly: resolve with <strong>{encounter.resource_amount} {resourceLabel}</strong> and{' '}
+                <strong>{encounter.cost} Aether</strong>.
+              </p>
+              {resources !== undefined && !canAfford && (
+                <p className="text-amber-400/90 text-xs">
+                  {resources[encounter.resource] < encounter.resource_amount
+                    ? `Need ${encounter.resource_amount - resources[encounter.resource]} more ${resourceLabel} (log ${encounter.resource === 'strikes' ? 'Strength' : encounter.resource === 'wards' ? 'Yoga' : 'Cardio'}).`
+                    : resources.aether < encounter.cost
+                      ? `Need ${encounter.cost - resources.aether} more Aether (log Wellness).`
+                      : null}
+                </p>
+              )}
+            </div>
           ) : (
             <p className="text-slate-200 text-sm">
               Requires <strong>{encounter.strikes} Strikes</strong> to defeat.
@@ -161,7 +191,7 @@ export function EncounterPanel({
         </div>
 
         {/* Loot preview */}
-        {(lootDrop || encounter.gold > 0 || (xp !== undefined && xp > 0)) && (
+        {(lootDrop || encounter.gold > 0 || (xp !== undefined && xp > 0) || isAnomaly) && (
           <div className="bg-slate-700/50 rounded-xl p-3 mb-4">
             <p className="text-slate-400 text-xs font-medium uppercase tracking-wide mb-2">
               Rewards
@@ -183,6 +213,9 @@ export function EncounterPanel({
                   {lootDrop.name}
                 </span>
               )}
+              {isAnomaly && !lootDrop && (
+                <span className="text-sky-300 text-xs">Lore / temporary clarity</span>
+              )}
             </div>
           </div>
         )}
@@ -190,9 +223,10 @@ export function EncounterPanel({
         <button
           type="button"
           onClick={onEngage}
-          className="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg shadow-indigo-500/20"
+          disabled={resources !== undefined && !canAfford}
+          className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-500 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg shadow-indigo-500/20"
         >
-          Engage Encounter
+          {isAnomaly ? 'Resolve Anomaly' : 'Engage Encounter'}
         </button>
       </div>
     </div>

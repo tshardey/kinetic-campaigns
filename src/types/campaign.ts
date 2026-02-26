@@ -41,13 +41,21 @@ export interface Encounter {
   loot_drop?: EncounterLootDrop;
 }
 
+/** Secondary resource required to resolve an anomaly (in addition to aether). */
+export type AnomalyResourceType = 'strikes' | 'wards' | 'slipstream';
+
 export interface DimensionalAnomaly {
   id: string;
   name: string;
   image_url?: string;
-  stat: string;
+  /** Aether cost to resolve (always required). */
   cost: number;
+  /** Secondary resource type and amount (e.g. 1 Strike, 1 Ward, 1 Slipstream). */
+  resource: AnomalyResourceType;
+  resource_amount: number;
   gold: number;
+  /** Flavor text shown on victory (e.g. lore or temporary buff description). */
+  lore_text?: string;
 }
 
 /** A single stage of a narrative rift with a stat check. */
@@ -77,7 +85,7 @@ export interface CampaignPackage {
 /** Encounter or anomaly placed on a hex for map display and engagement. Optional id links to campaign data for artwork/loot. */
 export type MapEncounter =
   | { id?: string; type: EncounterType; name: string; strikes: number; gold: number }
-  | { id?: string; type: 'anomaly'; name: string; stat: string; cost: number; gold: number };
+  | { id?: string; type: 'anomaly'; name: string; cost: number; resource: AnomalyResourceType; resource_amount: number; gold: number };
 
 /** Nexus Tent reward item (real-world reward for currency). */
 export interface NexusReward {

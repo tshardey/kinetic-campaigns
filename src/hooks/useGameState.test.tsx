@@ -173,4 +173,91 @@ describe('useGameState', () => {
     expect(result.current.progression.currency).toBe(99);
     expect(result.current.clearedHexes.has('2,2')).toBe(true);
   });
+
+  describe('engageEncounter (anomaly)', () => {
+    // Whispering Shrine in omija uses wards + aether
+    const anomalyEncounter = {
+      type: 'anomaly' as const,
+      name: 'The Whispering Shrine',
+      cost: 2,
+      resource: 'wards' as const,
+      resource_amount: 1,
+      gold: 30,
+    };
+
+    it('spends secondary resource and aether, then applies gold when resolving anomaly', () => {
+      const characterWithResources = {
+        ...validCharacter,
+        resources: { slipstream: 5, strikes: 2, wards: 1, aether: 3 },
+      };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+
+      act(() => {
+        result.current.setCharacter(characterWithResources);
+      });
+
+      const hexId = '3,4';
+      act(() => {
+        result.current.engageEncounter(hexId, anomalyEncounter);
+      });
+
+      expect(result.current.resources.aether).toBe(1);
+      expect(result.current.resources.wards).toBe(0);
+      expect(result.current.progression.currency).toBe(120 + 30);
+      expect(result.current.clearedHexes.has(hexId)).toBe(true);
+      expect(result.current.justClearedHexId).toBe(hexId);
+    });
+
+    it('does not clear hex or spend resources when player lacks secondary resource', () => {
+      const characterNoWards = {
+        ...validCharacter,
+        resources: { slipstream: 5, strikes: 2, wards: 0, aether: 3 },
+      };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+
+      act(() => {
+        result.current.setCharacter(characterNoWards);
+      });
+
+      const hexId = '1,1';
+      const currencyBefore = result.current.progression.currency;
+      const aetherBefore = result.current.resources.aether;
+
+      act(() => {
+        result.current.engageEncounter(hexId, anomalyEncounter);
+      });
+
+      expect(result.current.clearedHexes.has(hexId)).toBe(false);
+      expect(result.current.progression.currency).toBe(currencyBefore);
+      expect(result.current.resources.aether).toBe(aetherBefore);
+      expect(result.current.resources.wards).toBe(0);
+    });
+
+    it('does not clear hex when player lacks aether', () => {
+      const characterLowAether = {
+        ...validCharacter,
+        resources: { slipstream: 5, strikes: 2, wards: 1, aether: 1 },
+      };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+
+      act(() => {
+        result.current.setCharacter(characterLowAether);
+      });
+
+      const hexId = '2,2';
+      act(() => {
+        result.current.engageEncounter(hexId, { ...anomalyEncounter, cost: 2 });
+      });
+
+      expect(result.current.clearedHexes.has(hexId)).toBe(false);
+      expect(result.current.resources.aether).toBe(1);
+      expect(result.current.resources.wards).toBe(1);
+    });
+  });
 });

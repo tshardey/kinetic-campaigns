@@ -139,8 +139,9 @@ function toMapAnomaly(a: DimensionalAnomaly): MapEncounter {
     id: a.id,
     type: 'anomaly',
     name: a.name,
-    stat: a.stat,
     cost: a.cost,
+    resource: a.resource,
+    resource_amount: a.resource_amount,
     gold: a.gold,
   };
 }

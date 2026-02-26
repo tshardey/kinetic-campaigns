@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { AxialCoord } from '@/types/hex';
 import type { MapEncounter, CampaignPackage } from '@/types/campaign';
+import type { CharacterResources } from '@/types/character';
 import {
   generateRectGrid,
   hexToPixel,
@@ -28,6 +29,7 @@ interface HexGridProps {
   encounters: Record<string, MapEncounter>;
   campaign: CampaignPackage | null;
   lootFrameUrl: string;
+  resources?: CharacterResources;
   onMove: (q: number, r: number, id: string) => void;
   onEngageEncounter: (hexId: string, encounter: MapEncounter) => void;
   onContinueFromVictory: () => void;
@@ -44,6 +46,7 @@ export function HexGrid({
   encounters,
   campaign,
   lootFrameUrl,
+  resources,
   onMove,
   onEngageEncounter,
   onContinueFromVictory,
@@ -115,6 +118,7 @@ export function HexGrid({
           campaign={campaign}
           lootFrameUrl={lootFrameUrl}
           isVictory={showVictory}
+          resources={resources}
           onEngage={() => onEngageEncounter(playerHexId, currentEncounter)}
           onContinue={onContinueFromVictory}
         />

@@ -1,14 +1,20 @@
 /**
  * Slipstream, Strikes, Wards, and Aether management. Pure logic, no UI.
+ * Anomalies always cost aether + one other resource (strikes, wards, or slipstream).
  */
 
 import type { CharacterResources, ActivityType } from '@/types/character';
+import type { AnomalyResourceType } from '@/types/campaign';
 
 /** Encounter cost shape used for affordability and spending. */
 export interface EncounterCost {
   type: 'basic' | 'elite' | 'boss' | 'anomaly';
   strikes?: number;
-  cost?: number; // aether for anomaly
+  /** Aether cost (anomalies only). */
+  cost?: number;
+  /** Secondary resource for anomaly (strikes, wards, or slipstream). */
+  resource?: AnomalyResourceType;
+  resource_amount?: number;
 }
 
 /**
@@ -86,7 +92,21 @@ export function spendAether(
 }
 
 /**
- * Whether the player can afford to engage this encounter (strikes for combat, aether for anomaly).
+ * Spend Wards. Returns new resources or null if insufficient.
+ */
+export function spendWards(
+  current: CharacterResources,
+  amount: number
+): CharacterResources | null {
+  if (current.wards < amount) return null;
+  return {
+    ...current,
+    wards: current.wards - amount,
+  };
+}
+
+/**
+ * Whether the player can afford to engage this encounter (strikes for combat; aether + resource for anomaly).
  */
 export function canAffordEncounter(
   resources: CharacterResources,
@@ -94,7 +114,10 @@ export function canAffordEncounter(
 ): boolean {
   if (encounter.type === 'anomaly') {
     const cost = encounter.cost ?? 0;
-    return resources.aether >= cost;
+    const amount = encounter.resource_amount ?? 0;
+    const key = encounter.resource;
+    if (resources.aether < cost || !key || amount <= 0) return false;
+    return resources[key] >= amount;
   }
   const strikes = encounter.strikes ?? 0;
   return resources.strikes >= strikes;
@@ -102,6 +125,7 @@ export function canAffordEncounter(
 
 /**
  * Spend resources required for the encounter. Returns new resources or null if insufficient.
+ * For anomalies, spends aether then the secondary resource (strikes, wards, or slipstream).
  */
 export function spendForEncounter(
   current: CharacterResources,
@@ -109,7 +133,14 @@ export function spendForEncounter(
 ): CharacterResources | null {
   if (encounter.type === 'anomaly') {
     const cost = encounter.cost ?? 0;
-    return spendAether(current, cost);
+    const amount = encounter.resource_amount ?? 0;
+    const key = encounter.resource;
+    const afterAether = spendAether(current, cost);
+    if (!afterAether || !key || amount <= 0) return null;
+    if (key === 'strikes') return spendStrikes(afterAether, amount);
+    if (key === 'wards') return spendWards(afterAether, amount);
+    if (key === 'slipstream') return spendSlipstream(afterAether, amount);
+    return null;
   }
   const strikes = encounter.strikes ?? 0;
   return spendStrikes(current, strikes);

@@ -145,23 +145,29 @@ const anomalies: DimensionalAnomaly[] = [
   {
     id: 'whispering-shrine',
     name: 'The Whispering Shrine',
-    stat: 'Flow',
     cost: 2,
+    resource: 'wards',
+    resource_amount: 1,
     gold: 30,
+    lore_text: 'The shrine’s whispers still. You feel a surge of clarity—your Flow resonates with the realm.',
   },
   {
     id: 'tainted-tide-pool',
     name: 'The Tainted Tide-Pool',
-    stat: 'Brawn',
     cost: 2,
+    resource: 'strikes',
+    resource_amount: 1,
     gold: 30,
+    lore_text: 'You purge the corruption with raw force. The pool clears; the water reflects the sky again.',
   },
   {
     id: 'riddle-mask-maker',
     name: 'Riddle of the Mask-Maker',
-    stat: 'Focus',
     cost: 2,
+    resource: 'slipstream',
+    resource_amount: 1,
     gold: 30,
+    lore_text: 'You solve the riddle. The mask-maker nods and fades, leaving a blessing of sharpened focus.',
   },
 ];
 

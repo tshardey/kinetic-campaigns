@@ -22,9 +22,9 @@ const minimalCampaign: CampaignPackage = {
     { id: 'boss1', type: 'boss', name: 'Boss', strikes: 5, gold: 200 },
   ],
   anomalies: [
-    { id: 'a1', name: 'Anomaly 1', stat: 'Flow', cost: 2, gold: 30 },
-    { id: 'a2', name: 'Anomaly 2', stat: 'Focus', cost: 2, gold: 30 },
-    { id: 'a3', name: 'Anomaly 3', stat: 'Haste', cost: 2, gold: 30 },
+    { id: 'a1', name: 'Anomaly 1', cost: 2, resource: 'strikes', resource_amount: 1, gold: 30 },
+    { id: 'a2', name: 'Anomaly 2', cost: 2, resource: 'wards', resource_amount: 1, gold: 30 },
+    { id: 'a3', name: 'Anomaly 3', cost: 2, resource: 'slipstream', resource_amount: 1, gold: 30 },
   ],
   rifts: [],
 };
@@ -78,7 +78,8 @@ describe('placeEncounters', () => {
     const keysB = Object.keys(b).sort();
     // At least some hex ids or encounter assignments may differ
     const sameKeys = keysA.length === keysB.length && keysA.every((k, i) => k === keysB[i]);
-    const sameNames = keysA.every((id) => a[id].name === b[id].name);
+    const commonIds = keysA.filter((k) => k in b);
+    const sameNames = commonIds.length > 0 && commonIds.every((id) => a[id].name === b[id].name);
     expect(sameKeys && sameNames).toBe(false);
   });
 
@@ -135,7 +136,7 @@ describe('placeEncounters', () => {
     for (const [, enc] of Object.entries(result)) {
       expect(enc.name).toBeDefined();
       if (enc.type === 'anomaly') {
-        expect('stat' in enc && 'cost' in enc).toBe(true);
+        expect('cost' in enc && 'resource' in enc && 'resource_amount' in enc).toBe(true);
       } else {
         expect('strikes' in enc && 'gold' in enc).toBe(true);
       }

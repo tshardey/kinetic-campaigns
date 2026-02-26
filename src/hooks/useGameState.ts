@@ -138,11 +138,12 @@ export function useGameState({ cols, rows, campaign }: GameStateHookParams): Gam
     (hexId: string, encounter: MapEncounter) => {
       const costShape =
         encounter.type === 'anomaly'
-          ? { type: 'anomaly' as const, cost: encounter.cost }
+          ? { type: 'anomaly' as const, cost: encounter.cost, resource: encounter.resource, resource_amount: encounter.resource_amount }
           : { type: encounter.type, strikes: encounter.strikes };
       if (!canAffordEncounter(resources, costShape)) {
         if (encounter.type === 'anomaly') {
-          alert(`Need ${encounter.cost} Aether to clear this anomaly.`);
+          const resourceLabel = encounter.resource === 'strikes' ? 'Strike(s)' : encounter.resource === 'wards' ? 'Ward(s)' : 'Slipstream';
+          alert(`Need ${encounter.resource_amount} ${resourceLabel} and ${encounter.cost} Aether to resolve this anomaly.`);
         } else {
           alert(`Need ${encounter.strikes} Strikes to defeat ${encounter.name}. Log more Strength!`);
         }

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { AxialCoord } from '@/types/hex';
-import type { MapEncounter } from '@/types/campaign';
+import type { MapEncounter, CampaignPackage } from '@/types/campaign';
 import {
   generateRectGrid,
   hexToPixel,
@@ -23,9 +23,14 @@ interface HexGridProps {
   playerPos: AxialCoord;
   revealedHexes: Set<string>;
   clearedHexes: Set<string>;
+  /** When set, the panel for this hex shows victory state until onContinueFromVictory is called. */
+  justClearedHexId: string | null;
   encounters: Record<string, MapEncounter>;
+  campaign: CampaignPackage | null;
+  lootFrameUrl: string;
   onMove: (q: number, r: number, id: string) => void;
   onEngageEncounter: (hexId: string, encounter: MapEncounter) => void;
+  onContinueFromVictory: () => void;
 }
 
 export function HexGrid({
@@ -35,9 +40,13 @@ export function HexGrid({
   playerPos,
   revealedHexes,
   clearedHexes,
+  justClearedHexId,
   encounters,
+  campaign,
+  lootFrameUrl,
   onMove,
   onEngageEncounter,
+  onContinueFromVictory,
 }: HexGridProps) {
   const grid = useMemo(() => generateRectGrid(cols, rows), [cols, rows]);
   const hexPoints = useMemo(() => getHexPoints(DEFAULT_HEX_SIZE), []);
@@ -53,6 +62,8 @@ export function HexGrid({
   const playerHexId = `${playerPos.q},${playerPos.r}`;
   const currentEncounter = encounters[playerHexId];
   const isCurrentCleared = clearedHexes.has(playerHexId);
+  const showVictory = isCurrentCleared && playerHexId === justClearedHexId;
+  const showPanel = currentEncounter && (!isCurrentCleared || showVictory);
 
   const viewBox = `0 0 ${transform.viewBoxWidth} ${transform.viewBoxHeight}`;
   const [bgImageError, setBgImageError] = useState(false);
@@ -98,10 +109,14 @@ export function HexGrid({
         </svg>
       </div>
 
-      {currentEncounter && !isCurrentCleared && (
+      {showPanel && currentEncounter && (
         <EncounterPanel
           encounter={currentEncounter}
+          campaign={campaign}
+          lootFrameUrl={lootFrameUrl}
+          isVictory={showVictory}
           onEngage={() => onEngageEncounter(playerHexId, currentEncounter)}
+          onContinue={onContinueFromVictory}
         />
       )}
     </div>

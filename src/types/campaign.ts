@@ -74,10 +74,10 @@ export interface CampaignPackage {
   rifts: NarrativeRift[];
 }
 
-/** Encounter or anomaly placed on a hex for map display and engagement. */
+/** Encounter or anomaly placed on a hex for map display and engagement. Optional id links to campaign data for artwork/loot. */
 export type MapEncounter =
-  | { type: EncounterType; name: string; strikes: number; gold: number }
-  | { type: 'anomaly'; name: string; stat: string; cost: number; gold: number };
+  | { id?: string; type: EncounterType; name: string; strikes: number; gold: number }
+  | { id?: string; type: 'anomaly'; name: string; stat: string; cost: number; gold: number };
 
 /** Nexus Tent reward item (real-world reward for currency). */
 export interface NexusReward {

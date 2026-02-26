@@ -126,6 +126,7 @@ export function placeEncounters(
 
 function toMapEncounter(e: Encounter): MapEncounter {
   return {
+    id: e.id,
     type: e.type,
     name: e.name,
     strikes: e.strikes,
@@ -135,6 +136,7 @@ function toMapEncounter(e: Encounter): MapEncounter {
 
 function toMapAnomaly(a: DimensionalAnomaly): MapEncounter {
   return {
+    id: a.id,
     type: 'anomaly',
     name: a.name,
     stat: a.stat,

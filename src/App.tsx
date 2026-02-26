@@ -59,6 +59,7 @@ function App() {
   const [playerPos, setPlayerPos] = useState({ q: startQ, r: startR });
   const [revealedHexes, setRevealedHexes] = useState(INITIAL_REVEALED);
   const [clearedHexes, setClearedHexes] = useState(new Set<string>([]));
+  const [justClearedHexId, setJustClearedHexId] = useState<string | null>(null);
 
   useEffect(() => {
     if (character) {
@@ -110,6 +111,7 @@ function App() {
     const xpGain = encounter.type === 'elite' ? 1 : encounter.type === 'boss' ? 3 : 0;
     setClearedHexes((prev) => new Set(prev).add(hexId));
     setProgression((prev) => applyEncounterReward(prev, encounter.gold, xpGain));
+    setJustClearedHexId(hexId);
   };
 
   const purchaseReward = (reward: NexusReward) => {
@@ -169,9 +171,13 @@ function App() {
               playerPos={playerPos}
               revealedHexes={revealedHexes}
               clearedHexes={clearedHexes}
+              justClearedHexId={justClearedHexId}
               encounters={PLACED_ENCOUNTERS}
+              campaign={omijaCampaign}
+              lootFrameUrl={omijaCampaign.realm.loot_frame_url}
               onMove={movePlayer}
               onEngageEncounter={engageEncounter}
+              onContinueFromVictory={() => setJustClearedHexId(null)}
             />
           )}
           {activeTab === 'nexus' && (

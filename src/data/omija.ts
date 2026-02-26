@@ -39,6 +39,7 @@ const encounters: Encounter[] = [
     image_url: `${CAMPAIGN_BASE}/encounters/basic/mud-eel-scavenger.png`,
     strikes: 1,
     gold: 10,
+    xp: 1,
   },
   {
     id: 'inkrot-puffer',
@@ -47,6 +48,7 @@ const encounters: Encounter[] = [
     image_url: `${CAMPAIGN_BASE}/encounters/basic/inkrot-puffer.png`,
     strikes: 1,
     gold: 10,
+    xp: 1,
   },
   {
     id: 'thief-of-echoes',
@@ -55,6 +57,7 @@ const encounters: Encounter[] = [
     image_url: `${CAMPAIGN_BASE}/encounters/basic/thief-of-echoes.png`,
     strikes: 1,
     gold: 10,
+    xp: 1,
   },
   {
     id: 'gale-weed-sprite',
@@ -63,6 +66,7 @@ const encounters: Encounter[] = [
     image_url: `${CAMPAIGN_BASE}/encounters/basic/gale-weed-sprite.png`,
     strikes: 1,
     gold: 10,
+    xp: 1,
   },
   {
     id: 'awakened-automaton',
@@ -71,6 +75,7 @@ const encounters: Encounter[] = [
     image_url: `${CAMPAIGN_BASE}/encounters/basic/awakened-automaton.png`,
     strikes: 1,
     gold: 10,
+    xp: 1,
   },
   // Elite (Tier 2 – 3 Strikes)
   {
@@ -80,7 +85,7 @@ const encounters: Encounter[] = [
     image_url: `${CAMPAIGN_BASE}/encounters/elite/sovereigns-vanguard.png`,
     strikes: 3,
     gold: 50,
-    xp: 1,
+    xp: 2,
     loot_drop: {
       id: 'vial-of-sun-catch',
       name: 'Vial of Sun-Catch',
@@ -96,7 +101,7 @@ const encounters: Encounter[] = [
     image_url: `${CAMPAIGN_BASE}/encounters/elite/master-of-the-crag.png`,
     strikes: 3,
     gold: 50,
-    xp: 1,
+    xp: 2,
     loot_drop: {
       id: 'iron-silk-parasol',
       name: 'Iron-Silk Parasol',
@@ -113,7 +118,7 @@ const encounters: Encounter[] = [
     image_url: `${CAMPAIGN_BASE}/encounters/elite/echo-of-forgotten-shogun.png`,
     strikes: 3,
     gold: 50,
-    xp: 1,
+    xp: 2,
     loot_drop: {
       id: 'memory-censer',
       name: 'Memory Censer',
@@ -130,7 +135,7 @@ const encounters: Encounter[] = [
     image_url: `${CAMPAIGN_BASE}/encounters/boss/obsidian-tempest.png`,
     strikes: 5,
     gold: 200,
-    xp: 3,
+    xp: 4,
     loot_drop: {
       id: 'talon-of-the-west-wind',
       name: 'Talon of the West Wind',

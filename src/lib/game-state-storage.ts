@@ -13,6 +13,8 @@ const LEGACY_CHARACTER_KEY = 'kinetic-campaigns-character';
 /** Progress per rift: riftId -> completed stage index (0 = none, 1 = stage 0 done, … stages.length = fully complete). */
 export type RiftProgress = Record<string, number>;
 
+export type CampaignStatus = 'active' | 'victory';
+
 export interface MapState {
   playerPos: { q: number; r: number };
   revealedHexes: string[];
@@ -21,6 +23,8 @@ export interface MapState {
   riftProgress?: RiftProgress;
   /** Remaining strikes required per encounter hex id; players can chip away over multiple days. */
   encounterHealth?: Record<string, number>;
+  /** Campaign win state; set when realm boss is defeated. */
+  campaignStatus?: CampaignStatus;
 }
 
 export interface PersistedGameState {
@@ -43,6 +47,7 @@ export function getDefaultMapState(cols: number, rows: number): MapState {
     clearedHexes: [],
     riftProgress: {},
     encounterHealth: {},
+    campaignStatus: 'active',
   };
 }
 
@@ -82,6 +87,7 @@ export function loadGameState(cols: number, rows: number): PersistedGameState | 
           const mapState = {
             ...data.mapState,
             encounterHealth: data.mapState.encounterHealth ?? {},
+            campaignStatus: data.mapState.campaignStatus ?? 'active',
           };
           return {
             character: ensureCharacterHp(data.character),

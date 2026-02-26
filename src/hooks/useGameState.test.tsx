@@ -471,7 +471,7 @@ describe('useGameState', () => {
       expect(result.current.progression.level).toBe(1);
       expect(result.current.pendingProgressionAfterLevelUp).not.toBeNull();
       expect(result.current.pendingProgressionAfterLevelUp!.level).toBe(2);
-      expect(result.current.pendingProgressionAfterLevelUp!.xp).toBe(0);
+      expect(result.current.pendingProgressionAfterLevelUp!.xp).toBe(1); // 9 + 2 (elite XP) = 11, cap 10 → overflow 1
       expect(result.current.pendingProgressionAfterLevelUp!.currency).toBe(170);
     });
 
@@ -514,7 +514,7 @@ describe('useGameState', () => {
       expect(result.current.pendingLevelUp).toBe(false);
       expect(result.current.pendingProgressionAfterLevelUp).toBeNull();
       expect(result.current.progression.level).toBe(2);
-      expect(result.current.progression.xp).toBe(0);
+      expect(result.current.progression.xp).toBe(1); // overflow from 9 + 2 (elite XP)
       expect(result.current.character!.stats.focus).toBe(focusBefore + 1);
     });
 
@@ -565,6 +565,111 @@ describe('useGameState', () => {
       expect(result.current.character!.hp).toBe(2);
       act(() => result.current.completeLevelUp({ type: 'stat', stat: 'focus' }));
       expect(result.current.character!.hp).toBe(5);
+    });
+  });
+
+  describe('boss gate and campaign victory', () => {
+    const bossEncounter = {
+      type: 'boss' as const,
+      id: 'obsidian-tempest',
+      name: 'The Obsidian Tempest',
+      strikes: 5,
+      gold: 200,
+    };
+    const eliteEncounter = {
+      type: 'elite' as const,
+      id: 'sovereigns-vanguard',
+      name: "The Sovereign's Vanguard",
+      strikes: 3,
+      gold: 50,
+    };
+
+    it('campaignStatus defaults to active when no save exists', () => {
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      act(() => result.current.setCharacter(validCharacter));
+      expect(result.current.campaignStatus).toBe('active');
+    });
+
+    it('blocks boss attack when not all elites defeated and notifies', () => {
+      const placedEncounters: Record<string, { type: string; id?: string; name: string; strikes: number; gold: number }> = {
+        '1,1': { ...eliteEncounter },
+        '2,2': { ...eliteEncounter, id: 'master-of-the-crag', name: 'Master of the Crag' },
+        '3,3': bossEncounter,
+      };
+      const toast = vi.fn();
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, placedEncounters, toast })
+      );
+      act(() => result.current.setCharacter(validCharacter));
+      act(() => result.current.setClearedHexes(new Set(['1,1']))); // only one elite cleared
+      act(() => result.current.setRiftProgress({ 'moon-cats-vigil': 3 })); // rift closed
+
+      act(() =>
+        result.current.engageEncounter('3,3', bossEncounter)
+      );
+
+      expect(toast).toHaveBeenCalledWith(
+        'You must defeat all Elite encounters and fully close the Narrative Rift before facing the Realm Boss.',
+        'error'
+      );
+      expect(result.current.clearedHexes.has('3,3')).toBe(false);
+      expect(result.current.resources.strikes).toBe(2);
+    });
+
+    it('blocks boss attack when rift is not fully closed and notifies', () => {
+      const placedEncounters: Record<string, { type: string; id?: string; name: string; strikes: number; gold: number }> = {
+        '1,1': { ...eliteEncounter },
+        '2,2': { ...eliteEncounter, id: 'master-of-the-crag', name: 'Master of the Crag' },
+        '3,3': bossEncounter,
+      };
+      const toast = vi.fn();
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, placedEncounters, toast })
+      );
+      act(() => result.current.setCharacter(validCharacter));
+      act(() => result.current.setClearedHexes(new Set(['1,1', '2,2']))); // all elites cleared
+      act(() => result.current.setRiftProgress({ 'moon-cats-vigil': 1 })); // rift not closed
+
+      act(() =>
+        result.current.engageEncounter('3,3', bossEncounter)
+      );
+
+      expect(toast).toHaveBeenCalledWith(
+        'You must defeat all Elite encounters and fully close the Narrative Rift before facing the Realm Boss.',
+        'error'
+      );
+      expect(result.current.clearedHexes.has('3,3')).toBe(false);
+    });
+
+    it('allows boss attack when all elites defeated and rift closed, and sets campaignStatus to victory on boss defeat', () => {
+      const placedEncounters: Record<string, { type: string; id?: string; name: string; strikes: number; gold: number }> = {
+        '1,1': { ...eliteEncounter },
+        '2,2': { ...eliteEncounter, id: 'master-of-the-crag', name: 'Master of the Crag' },
+        '3,3': { ...eliteEncounter, id: 'echo-forgotten-shogun', name: 'Echo of the Forgotten Shogun' },
+        '4,4': bossEncounter,
+      };
+      const charWithStrikes = {
+        ...validCharacter,
+        resources: { slipstream: 5, strikes: 5, wards: 0, aether: 1 },
+      };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, placedEncounters })
+      );
+      act(() => result.current.setCharacter(charWithStrikes));
+      act(() => result.current.setClearedHexes(new Set(['1,1', '2,2', '3,3'])));
+      act(() => result.current.setRiftProgress({ 'moon-cats-vigil': 3 }));
+
+      expect(result.current.campaignStatus).toBe('active');
+
+      for (let i = 0; i < 5; i++) {
+        act(() => result.current.engageEncounter('4,4', bossEncounter));
+      }
+
+      expect(result.current.clearedHexes.has('4,4')).toBe(true);
+      expect(result.current.campaignStatus).toBe('victory');
+      expect(result.current.progression.currency).toBe(120 + 200);
     });
   });
 });

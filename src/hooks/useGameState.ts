@@ -8,7 +8,7 @@ import type { Character, CharacterResources, Progression, InventoryItem, LevelUp
 import type { ActivityType } from '@/types/character';
 import type { MapEncounter, NexusReward } from '@/types/campaign';
 import type { CampaignPackage } from '@/types/campaign';
-import type { RiftProgress } from '@/lib/game-state-storage';
+import type { RiftProgress, CampaignStatus } from '@/lib/game-state-storage';
 import { applyActivity, canAffordMove, spendSlipstream, canAffordEncounter, spendForEncounter, spendStrikes, spendWards, spendAether } from '@/engine/resources';
 import { applyEncounterRewardWithLevelUpFlow, spendCurrency, addCurrency } from '@/engine/progression';
 import { getAdjacentHexIds } from '@/engine/hex-math';
@@ -24,6 +24,8 @@ export interface GameStateHookParams {
   cols: number;
   rows: number;
   campaign: CampaignPackage;
+  /** Placed encounters (hexId -> encounter) for boss gate: requires all elites defeated and rifts closed. */
+  placedEncounters?: Record<string, MapEncounter>;
   /** When provided, used instead of alert() for user messages. */
   toast?: (message: string, type?: 'info' | 'error') => void;
 }
@@ -49,6 +51,7 @@ export interface GameStateHookResult {
   setJustClearedHexId: React.Dispatch<React.SetStateAction<string | null>>;
   riftProgress: RiftProgress;
   setRiftProgress: React.Dispatch<React.SetStateAction<RiftProgress>>;
+  campaignStatus: CampaignStatus;
   logWorkout: (type: ActivityType, durationMinutes?: number) => void;
   movePlayer: (q: number, r: number, id: string) => void;
   engageEncounter: (hexId: string, encounter: MapEncounter) => void;
@@ -68,7 +71,7 @@ export interface GameStateHookResult {
  * Manages full game state with localStorage persistence.
  * When character is first set (e.g. after creation), map state is initialized to default.
  */
-export function useGameState({ cols, rows, campaign, toast }: GameStateHookParams): GameStateHookResult {
+export function useGameState({ cols, rows, campaign, placedEncounters = {}, toast }: GameStateHookParams): GameStateHookResult {
   const notify = toast ?? ((msg: string) => { alert(msg); });
   const [character, setCharacterState] = useState<Character | null>(() => {
     const loaded = loadGameState(cols, rows);
@@ -109,6 +112,10 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
     const loaded = loadGameState(cols, rows);
     return loaded?.mapState?.riftProgress ?? {};
   });
+  const [campaignStatus, setCampaignStatus] = useState<CampaignStatus>(() => {
+    const loaded = loadGameState(cols, rows);
+    return (loaded?.mapState as { campaignStatus?: CampaignStatus } | undefined)?.campaignStatus ?? 'active';
+  });
   const [pendingLevelUp, setPendingLevelUp] = useState<boolean>(() => {
     const loaded = loadGameState(cols, rows);
     return (loaded as { pendingLevelUp?: boolean } | null)?.pendingLevelUp ?? false;
@@ -129,6 +136,7 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
           setClearedHexes(new Set(def.clearedHexes));
           setEncounterHealth(def.encounterHealth ?? {});
           setRiftProgress(def.riftProgress ?? {});
+          setCampaignStatus(def.campaignStatus ?? 'active');
           setResources(next.resources);
           setProgression(next.progression);
           setInventory(next.inventory ?? []);
@@ -194,6 +202,23 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
         return;
       }
 
+      // Boss gate: require all elites defeated and all rifts fully closed
+      if (encounter.type === 'boss') {
+        const eliteEntries = Object.entries(placedEncounters).filter(([, e]) => e.type === 'elite');
+        const totalElites = eliteEntries.length;
+        const defeatedElites = eliteEntries.filter(([hexId]) => clearedHexes.has(hexId)).length;
+        const riftsFullyClosed =
+          (campaign.rifts?.length ?? 0) > 0 &&
+          campaign.rifts!.every((r) => (riftProgress[r.id] ?? 0) >= r.stages.length);
+        if (defeatedElites < totalElites || !riftsFullyClosed) {
+          notify(
+            'You must defeat all Elite encounters and fully close the Narrative Rift before facing the Realm Boss.',
+            'error'
+          );
+          return;
+        }
+      }
+
       // Combat: spend up to min(available Strikes, enemy remaining HP) per turn; then one retaliation if enemy survives
       if (resources.strikes < 1) {
         notify('Need 1 Strike to attack. Log more Strength!', 'error');
@@ -219,7 +244,10 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
 
       if (newEnemyHp <= 0) {
         // Victory: grant loot/XP, mark hex cleared
-        const xpGain = encounter.type === 'elite' ? 1 : encounter.type === 'boss' ? 3 : 0;
+        const fullEncounter = campaign.encounters.find(
+          (e) => e.id === encounter.id || (e.name === encounter.name && e.type === encounter.type)
+        );
+        const xpGain = fullEncounter?.xp ?? (encounter.type === 'basic' ? 1 : encounter.type === 'elite' ? 2 : 4);
         setClearedHexes((prev) => new Set(prev).add(hexId));
         setProgression((prev) => {
           const result = applyEncounterRewardWithLevelUpFlow(prev, encounter.gold, xpGain);
@@ -230,10 +258,10 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
           }
           return result.progression;
         });
+        if (encounter.type === 'boss') {
+          setCampaignStatus('victory');
+        }
         if (encounter.id) {
-          const fullEncounter = campaign.encounters.find(
-            (e) => e.id === encounter.id || (e.name === encounter.name && e.type === encounter.type)
-          );
           if (fullEncounter?.loot_drop) {
             const item = lootDropToInventoryItem(fullEncounter.loot_drop);
             setInventory((prev) => [...prev, item]);
@@ -265,7 +293,7 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
           if (!prev) return null;
           const newHp = Math.max(0, prev.hp - 1);
           if (newHp > 0) return { ...prev, hp: newHp };
-          return { ...prev, hp: prev.maxHp };
+          return { ...prev, hp: prev.maxHp ?? 5 };
         });
         if (wouldBeZeroHp) {
           const startHexId = getDefaultStartHexId(cols, rows);
@@ -275,7 +303,19 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
         }
       }
     },
-    [resources, character, encounterHealth, cols, rows, campaign.encounters, notify]
+    [
+      resources,
+      character,
+      encounterHealth,
+      clearedHexes,
+      riftProgress,
+      campaign.encounters,
+      campaign.rifts,
+      placedEncounters,
+      cols,
+      rows,
+      notify,
+    ]
   );
 
   const useConsumable = useCallback((item: InventoryItem, choice?: 'haste' | 'flow') => {
@@ -414,11 +454,12 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
         clearedHexes: Array.from(clearedHexes),
         riftProgress,
         encounterHealth,
+        campaignStatus,
       },
       pendingLevelUp: pendingLevelUp || undefined,
       pendingProgressionAfterLevelUp: pendingProgressionAfterLevelUp ?? undefined,
     });
-  }, [character, resources, progression, inventory, playerPos, revealedHexes, clearedHexes, encounterHealth, riftProgress, pendingLevelUp, pendingProgressionAfterLevelUp]);
+  }, [character, resources, progression, inventory, playerPos, revealedHexes, clearedHexes, encounterHealth, riftProgress, campaignStatus, pendingLevelUp, pendingProgressionAfterLevelUp]);
 
   return {
     character,
@@ -441,6 +482,7 @@ export function useGameState({ cols, rows, campaign, toast }: GameStateHookParam
     setJustClearedHexId,
     riftProgress,
     setRiftProgress,
+    campaignStatus,
     logWorkout,
     movePlayer,
     engageEncounter,

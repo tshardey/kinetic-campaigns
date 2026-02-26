@@ -47,7 +47,7 @@ function App() {
     pendingLevelUp,
     pendingProgressionAfterLevelUp,
     completeLevelUp,
-  } = useGameState({ cols, rows, campaign, toast });
+  } = useGameState({ cols, rows, campaign, placedEncounters, toast });
 
   const [activeTab, setActiveTab] = useState<'map' | 'nexus'>('map');
   const [sidebarOpen, setSidebarOpen] = useState(false);

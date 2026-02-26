@@ -71,7 +71,7 @@ export function EncounterPanel({
     isCombat && 'loot_drop' in full ? (full as Encounter).loot_drop : undefined;
   const xp = isCombat && 'xp' in full ? (full as Encounter).xp : undefined;
   const xpEarned =
-    encounter.type === 'elite' ? 1 : encounter.type === 'boss' ? 3 : 0;
+    xp ?? (encounter.type === 'basic' ? 1 : encounter.type === 'elite' ? 2 : encounter.type === 'boss' ? 4 : 0);
   const tierLabel = getTierLabel(encounter.type);
   const tierStyles = getTierStyles(encounter.type);
   const anomalyLore = isAnomaly && full && 'lore_text' in full ? (full as DimensionalAnomaly).lore_text : undefined;
@@ -116,7 +116,7 @@ export function EncounterPanel({
           <span className="text-amber-400 font-medium">
             +{encounter.gold} gold
           </span>
-          {xp !== undefined && xp > 0 && (
+          {xpEarned > 0 && (
             <span className="text-indigo-300 font-medium">+{xpEarned} XP</span>
           )}
         </div>

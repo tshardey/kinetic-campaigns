@@ -4,13 +4,13 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import type { Character, CharacterResources, Progression, InventoryItem } from '@/types/character';
+import type { Character, CharacterResources, Progression, InventoryItem, LevelUpChoice } from '@/types/character';
 import type { ActivityType } from '@/types/character';
 import type { MapEncounter, NexusReward } from '@/types/campaign';
 import type { CampaignPackage } from '@/types/campaign';
 import type { RiftProgress } from '@/lib/game-state-storage';
 import { applyActivity, canAffordMove, spendSlipstream, canAffordEncounter, spendForEncounter } from '@/engine/resources';
-import { applyEncounterReward, spendCurrency } from '@/engine/progression';
+import { applyEncounterRewardWithLevelUpFlow, spendCurrency } from '@/engine/progression';
 import { getAdjacentHexIds } from '@/engine/hex-math';
 import { applyArtifactOnAcquisition, getConsumableEffect, lootDropToInventoryItem } from '@/engine/inventory';
 import { canAffordRiftStage, spendForRiftStage } from '@/engine/rift';
@@ -23,6 +23,8 @@ export interface GameStateHookParams {
   cols: number;
   rows: number;
   campaign: CampaignPackage;
+  /** When provided, used instead of alert() for user messages. */
+  toast?: (message: string, type?: 'info' | 'error') => void;
 }
 
 export interface GameStateHookResult {
@@ -44,19 +46,25 @@ export interface GameStateHookResult {
   setJustClearedHexId: React.Dispatch<React.SetStateAction<string | null>>;
   riftProgress: RiftProgress;
   setRiftProgress: React.Dispatch<React.SetStateAction<RiftProgress>>;
-  logWorkout: (type: ActivityType) => void;
+  logWorkout: (type: ActivityType, durationMinutes?: number) => void;
   movePlayer: (q: number, r: number, id: string) => void;
   engageEncounter: (hexId: string, encounter: MapEncounter) => void;
   attemptRiftStage: (hexId: string, riftId: string, stageIndex: number) => boolean;
   useConsumable: (item: InventoryItem, choice?: 'haste' | 'flow') => void;
   purchaseReward: (reward: NexusReward) => void;
+  /** Level-up flow: true when XP at cap and user must choose reward. */
+  pendingLevelUp: boolean;
+  /** Progression to apply after level-up choice. */
+  pendingProgressionAfterLevelUp: Progression | null;
+  completeLevelUp: (choice: import('@/types/character').LevelUpChoice) => void;
 }
 
 /**
  * Manages full game state with localStorage persistence.
  * When character is first set (e.g. after creation), map state is initialized to default.
  */
-export function useGameState({ cols, rows, campaign }: GameStateHookParams): GameStateHookResult {
+export function useGameState({ cols, rows, campaign, toast }: GameStateHookParams): GameStateHookResult {
+  const notify = toast ?? ((msg: string) => { alert(msg); });
   const [character, setCharacterState] = useState<Character | null>(() => {
     const loaded = loadGameState(cols, rows);
     return loaded?.character ?? null;
@@ -92,6 +100,14 @@ export function useGameState({ cols, rows, campaign }: GameStateHookParams): Gam
     const loaded = loadGameState(cols, rows);
     return loaded?.mapState?.riftProgress ?? {};
   });
+  const [pendingLevelUp, setPendingLevelUp] = useState<boolean>(() => {
+    const loaded = loadGameState(cols, rows);
+    return (loaded as { pendingLevelUp?: boolean } | null)?.pendingLevelUp ?? false;
+  });
+  const [pendingProgressionAfterLevelUp, setPendingProgressionAfterLevelUp] = useState<Progression | null>(() => {
+    const loaded = loadGameState(cols, rows) as { pendingProgressionAfterLevelUp?: Progression } | null;
+    return loaded?.pendingProgressionAfterLevelUp ?? null;
+  });
 
   const setCharacter = useCallback(
     (next: Character | null) => {
@@ -113,35 +129,33 @@ export function useGameState({ cols, rows, campaign }: GameStateHookParams): Gam
     [cols, rows]
   );
 
-  const logWorkout = useCallback((type: ActivityType) => {
-    setResources((prev) => applyActivity(prev, type));
+  const logWorkout = useCallback((type: ActivityType, durationMinutes?: number) => {
+    setResources((prev) => applyActivity(prev, type, durationMinutes));
   }, []);
 
   const movePlayer = useCallback(
     (q: number, r: number, id: string) => {
-      setPlayerPos((pos) => {
-        const dq = Math.abs(pos.q - q);
-        const dr = Math.abs(pos.r - r);
-        const ds = Math.abs(-pos.q - pos.r - (-q - r));
-        const distance = Math.max(dq, dr, ds);
-        if (distance !== 1) return pos;
-        if (!canAffordMove(resources)) {
-          alert('Not enough Slipstream Tokens! Log some Cardio.');
-          return pos;
-        }
-        const nextResources = spendSlipstream(resources);
-        if (!nextResources) return pos;
-        setResources(nextResources);
-        setRevealedHexes((rev) => {
-          const next = new Set(rev);
-          next.add(id);
-          getAdjacentHexIds(q, r).forEach((adjId) => next.add(adjId));
-          return next;
-        });
-        return { q, r };
+      if (!canAffordMove(resources)) {
+        notify('Not enough Slipstream Tokens! Log some Cardio.', 'error');
+        return;
+      }
+      const dq = Math.abs(playerPos.q - q);
+      const dr = Math.abs(playerPos.r - r);
+      const ds = Math.abs(-playerPos.q - playerPos.r - (-q - r));
+      const distance = Math.max(dq, dr, ds);
+      if (distance !== 1) return;
+      const nextResources = spendSlipstream(resources);
+      if (!nextResources) return;
+      setResources(nextResources);
+      setRevealedHexes((rev) => {
+        const next = new Set(rev);
+        next.add(id);
+        getAdjacentHexIds(q, r).forEach((adjId) => next.add(adjId));
+        return next;
       });
+      setPlayerPos({ q, r });
     },
-    [resources]
+    [resources, playerPos, notify]
   );
 
   const engageEncounter = useCallback(
@@ -153,9 +167,9 @@ export function useGameState({ cols, rows, campaign }: GameStateHookParams): Gam
       if (!canAffordEncounter(resources, costShape)) {
         if (encounter.type === 'anomaly') {
           const resourceLabel = encounter.resource === 'strikes' ? 'Strike(s)' : encounter.resource === 'wards' ? 'Ward(s)' : 'Slipstream';
-          alert(`Need ${encounter.resource_amount} ${resourceLabel} and ${encounter.cost} Aether to resolve this anomaly.`);
+          notify(`Need ${encounter.resource_amount} ${resourceLabel} and ${encounter.cost} Aether to resolve this anomaly.`, 'error');
         } else {
-          alert(`Need ${encounter.strikes} Strikes to defeat ${encounter.name}. Log more Strength!`);
+          notify(`Need ${encounter.strikes} Strikes to defeat ${encounter.name}. Log more Strength!`, 'error');
         }
         return;
       }
@@ -164,7 +178,15 @@ export function useGameState({ cols, rows, campaign }: GameStateHookParams): Gam
       setResources(nextResources);
       const xpGain = encounter.type === 'elite' ? 1 : encounter.type === 'boss' ? 3 : 0;
       setClearedHexes((prev) => new Set(prev).add(hexId));
-      setProgression((prev) => applyEncounterReward(prev, encounter.gold, xpGain));
+      setProgression((prev) => {
+        const result = applyEncounterRewardWithLevelUpFlow(prev, encounter.gold, xpGain);
+        if (result.leveledUp && result.nextProgressionAfterLevelUp) {
+          setPendingLevelUp(true);
+          setPendingProgressionAfterLevelUp(result.nextProgressionAfterLevelUp);
+          return result.progression;
+        }
+        return result.progression;
+      });
 
       if (encounter.type !== 'anomaly' && encounter.id) {
         const fullEncounter = campaign.encounters.find(
@@ -184,7 +206,7 @@ export function useGameState({ cols, rows, campaign }: GameStateHookParams): Gam
       }
       setJustClearedHexId(hexId);
     },
-    [resources, campaign.encounters]
+    [resources, campaign.encounters, notify]
   );
 
   const useConsumable = useCallback((item: InventoryItem, choice?: 'haste' | 'flow') => {
@@ -224,8 +246,33 @@ export function useGameState({ cols, rows, campaign }: GameStateHookParams): Gam
     setProgression((prev) => {
       const next = spendCurrency(prev, reward.cost);
       if (!next) return prev;
-      alert(`Purchased ${reward.title}! Go treat yourself.`);
+      notify(`Purchased ${reward.title}! Go treat yourself.`, 'info');
       return next;
+    });
+  }, [notify]);
+
+  const completeLevelUp = useCallback((choice: LevelUpChoice) => {
+    setPendingProgressionAfterLevelUp((nextProg) => {
+      if (!nextProg) return null;
+      setCharacterState((prev) => {
+        if (!prev) return null;
+        if (choice.type === 'new_move' || choice.type === 'cross_class_move') {
+          return {
+            ...prev,
+            learnedMoveIds: [...(prev.learnedMoveIds ?? []), choice.moveId],
+          };
+        }
+        return {
+          ...prev,
+          stats: {
+            ...prev.stats,
+            [choice.stat]: prev.stats[choice.stat] + 1,
+          },
+        };
+      });
+      setProgression(nextProg);
+      setPendingLevelUp(false);
+      return null;
     });
   }, []);
 
@@ -243,7 +290,15 @@ export function useGameState({ cols, rows, campaign }: GameStateHookParams): Gam
         setClearedHexes((prev) => new Set(prev).add(hexId));
         setJustClearedHexId(hexId);
         if (rift.completion_xp != null && rift.completion_xp > 0) {
-          setProgression((prev) => applyEncounterReward(prev, 0, rift.completion_xp));
+          setProgression((prev) => {
+            const result = applyEncounterRewardWithLevelUpFlow(prev, 0, rift.completion_xp!);
+            if (result.leveledUp && result.nextProgressionAfterLevelUp) {
+              setPendingLevelUp(true);
+              setPendingProgressionAfterLevelUp(result.nextProgressionAfterLevelUp);
+              return result.progression;
+            }
+            return result.progression;
+          });
         }
         if (rift.completion_loot) {
           const item = lootDropToInventoryItem(rift.completion_loot);
@@ -279,8 +334,10 @@ export function useGameState({ cols, rows, campaign }: GameStateHookParams): Gam
         clearedHexes: Array.from(clearedHexes),
         riftProgress,
       },
+      pendingLevelUp: pendingLevelUp || undefined,
+      pendingProgressionAfterLevelUp: pendingProgressionAfterLevelUp ?? undefined,
     });
-  }, [character, resources, progression, inventory, playerPos, revealedHexes, clearedHexes, riftProgress]);
+  }, [character, resources, progression, inventory, playerPos, revealedHexes, clearedHexes, riftProgress, pendingLevelUp, pendingProgressionAfterLevelUp]);
 
   return {
     character,
@@ -307,5 +364,8 @@ export function useGameState({ cols, rows, campaign }: GameStateHookParams): Gam
     attemptRiftStage,
     useConsumable,
     purchaseReward,
+    pendingLevelUp,
+    pendingProgressionAfterLevelUp,
+    completeLevelUp,
   };
 }

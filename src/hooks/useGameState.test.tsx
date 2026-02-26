@@ -136,6 +136,47 @@ describe('useGameState', () => {
     expect(result.current.resources.strikes).toBe(strikesBefore + 1);
   });
 
+  it('logWorkout with durationMinutes grants scaled units', () => {
+    const { result } = renderHook(() =>
+      useGameState({ cols: COLS, rows: ROWS, campaign })
+    );
+
+    act(() => {
+      result.current.setCharacter(validCharacter);
+    });
+
+    const slipstreamBefore = result.current.resources.slipstream;
+    act(() => {
+      result.current.logWorkout('cardio', 40); // 40 min = 2 slipstream
+    });
+    expect(result.current.resources.slipstream).toBe(slipstreamBefore + 2);
+  });
+
+  it('when toast is provided, movePlayer uses it instead of alert when cannot afford move', () => {
+    const toast = vi.fn();
+    const { result } = renderHook(() =>
+      useGameState({ cols: COLS, rows: ROWS, campaign, toast })
+    );
+
+    act(() => {
+      result.current.setCharacter({
+        ...validCharacter,
+        resources: { ...validCharacter.resources, slipstream: 0 },
+      });
+    });
+
+    const [q, r] = result.current.playerPos.q + 1 <= COLS - 1
+      ? [result.current.playerPos.q + 1, result.current.playerPos.r]
+      : [result.current.playerPos.q - 1, result.current.playerPos.r];
+    const id = `${q},${r}`;
+
+    act(() => {
+      result.current.movePlayer(q, r, id);
+    });
+
+    expect(toast).toHaveBeenCalledWith('Not enough Slipstream Tokens! Log some Cardio.', 'error');
+  });
+
   it('purchaseReward updates progression when affordable', () => {
     const { result } = renderHook(() =>
       useGameState({ cols: COLS, rows: ROWS, campaign })
@@ -342,6 +383,107 @@ describe('useGameState', () => {
       expect(moonCat).toBeDefined();
       expect(moonCat!.kind).toBe('artifact');
       expect(result.current.character!.stats.focus).toBe(initialFocus + 1);
+    });
+  });
+
+  describe('level-up flow', () => {
+    it('sets pendingLevelUp and holds progression at cap when encounter XP would level', () => {
+      const eliteEncounter = {
+        type: 'elite' as const,
+        id: 'sovereigns-vanguard',
+        name: "The Sovereign's Vanguard",
+        strikes: 3,
+        gold: 50,
+      };
+      const characterAtCap = {
+        ...validCharacter,
+        progression: { xp: 9, level: 1, currency: 120 },
+        resources: { slipstream: 5, strikes: 3, wards: 0, aether: 1 },
+      };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+
+      act(() => {
+        result.current.setCharacter(characterAtCap);
+      });
+
+      const hexId = '2,2';
+      act(() => {
+        result.current.engageEncounter(hexId, eliteEncounter);
+      });
+
+      expect(result.current.pendingLevelUp).toBe(true);
+      expect(result.current.progression.xp).toBe(10); // held at cap
+      expect(result.current.progression.level).toBe(1);
+      expect(result.current.pendingProgressionAfterLevelUp).not.toBeNull();
+      expect(result.current.pendingProgressionAfterLevelUp!.level).toBe(2);
+      expect(result.current.pendingProgressionAfterLevelUp!.xp).toBe(0);
+      expect(result.current.pendingProgressionAfterLevelUp!.currency).toBe(170);
+    });
+
+    it('completeLevelUp applies stat choice and clears pending', () => {
+      const eliteEncounter = {
+        type: 'elite' as const,
+        id: 'sovereigns-vanguard',
+        name: "The Sovereign's Vanguard",
+        strikes: 3,
+        gold: 50,
+      };
+      const characterAtCap = {
+        ...validCharacter,
+        progression: { xp: 9, level: 1, currency: 120 },
+        resources: { slipstream: 5, strikes: 3, wards: 0, aether: 1 },
+      };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+
+      act(() => {
+        result.current.setCharacter(characterAtCap);
+      });
+
+      act(() => {
+        result.current.engageEncounter('2,2', eliteEncounter);
+      });
+
+      const focusBefore = result.current.character!.stats.focus;
+      act(() => {
+        result.current.completeLevelUp({ type: 'stat', stat: 'focus' });
+      });
+
+      expect(result.current.pendingLevelUp).toBe(false);
+      expect(result.current.pendingProgressionAfterLevelUp).toBeNull();
+      expect(result.current.progression.level).toBe(2);
+      expect(result.current.progression.xp).toBe(0);
+      expect(result.current.character!.stats.focus).toBe(focusBefore + 1);
+    });
+
+    it('completeLevelUp with new_move adds move to learnedMoveIds', () => {
+      const characterAtCap = {
+        ...validCharacter,
+        progression: { xp: 9, level: 1, currency: 120 },
+        resources: { slipstream: 5, strikes: 3, wards: 0, aether: 1 },
+      };
+      saveGameState({
+        character: characterAtCap,
+        mapState: getDefaultMapState(COLS, ROWS),
+        pendingLevelUp: true,
+        pendingProgressionAfterLevelUp: { xp: 0, level: 2, currency: 120 },
+      });
+
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+
+      expect(result.current.pendingLevelUp).toBe(true);
+      act(() => {
+        result.current.completeLevelUp({ type: 'new_move', moveId: 'aura-of-conquest' });
+      });
+
+      expect(result.current.character!.learnedMoveIds).toContain('aura-of-conquest');
+      expect(result.current.pendingLevelUp).toBe(false);
+      expect(result.current.progression.level).toBe(2);
     });
   });
 });

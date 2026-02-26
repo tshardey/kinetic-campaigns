@@ -17,26 +17,42 @@ export interface EncounterCost {
   resource_amount?: number;
 }
 
+/** Minutes per 1 unit: 20 min cardio = 1 Slipstream, 15 min strength = 1 Strike, 20 min yoga = 1 Ward, 15 min wellness = 1 Aether. */
+export const ACTIVITY_MINUTES_PER_UNIT: Record<ActivityType, number> = {
+  cardio: 20,
+  strength: 15,
+  yoga: 20,
+  wellness: 15,
+};
+
 /**
  * Apply a logged activity and return updated resources.
+ * When durationMinutes is provided, grants units by floor(durationMinutes / threshold) (e.g. 20 min cardio = 1 Slipstream).
+ * When omitted, grants 1 unit (quick log). Under threshold grants 0.
  */
 export function applyActivity(
   current: CharacterResources,
-  activity: ActivityType
+  activity: ActivityType,
+  durationMinutes?: number
 ): CharacterResources {
   const next = { ...current };
+  const units =
+    durationMinutes != null && durationMinutes > 0
+      ? Math.floor(durationMinutes / ACTIVITY_MINUTES_PER_UNIT[activity])
+      : 1;
+  if (units < 1) return next;
   switch (activity) {
     case 'cardio':
-      next.slipstream += 1;
+      next.slipstream += units;
       break;
     case 'strength':
-      next.strikes += 1;
+      next.strikes += units;
       break;
     case 'yoga':
-      next.wards += 1;
+      next.wards += units;
       break;
     case 'wellness':
-      next.aether += 1;
+      next.aether += units;
       break;
   }
   return next;

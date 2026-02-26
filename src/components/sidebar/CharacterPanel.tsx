@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, BookOpen, ChevronDown, ChevronUp, Package } from 'lucide-react';
+import { Sparkles, BookOpen, ChevronDown, ChevronUp, Package, X } from 'lucide-react';
 import type { Character, CharacterResources, Progression, InventoryItem } from '@/types/character';
 import type { ActivityType } from '@/types/character';
 import { getXpCap } from '@/engine/progression';
@@ -13,8 +13,10 @@ interface CharacterPanelProps {
   progression: Progression;
   resources: CharacterResources;
   inventory: InventoryItem[];
-  onLogActivity: (type: ActivityType) => void;
+  onLogActivity: (type: ActivityType, durationMinutes?: number) => void;
   onUseConsumable: (item: InventoryItem, choice?: 'haste' | 'flow') => void;
+  /** When set, show a close button (e.g. for mobile overlay). */
+  onCloseSidebar?: () => void;
 }
 
 export function CharacterPanel({
@@ -24,6 +26,7 @@ export function CharacterPanel({
   inventory,
   onLogActivity,
   onUseConsumable,
+  onCloseSidebar,
 }: CharacterPanelProps) {
   const [sheetExpanded, setSheetExpanded] = useState(true);
   const [inventoryExpanded, setInventoryExpanded] = useState(true);
@@ -34,14 +37,26 @@ export function CharacterPanel({
   const startingMove = playbook?.startingMoves.find((m) => m.id === character.startingMoveId);
 
   return (
-    <aside className="w-80 bg-slate-900 border-r border-slate-800 flex flex-col shadow-2xl z-10">
-      <div className="p-6 border-b border-slate-800">
-        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-blue-500 mb-1">
-          Kinetic Campaigns
-        </h1>
-        <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
-          {character.name || 'The Worldhopper'}
-        </p>
+    <aside className="w-80 h-full bg-slate-900 border-r border-slate-800 flex flex-col shadow-2xl">
+      <div className="p-4 md:p-6 border-b border-slate-800 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="text-xl md:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-blue-500 mb-1">
+            Kinetic Campaigns
+          </h1>
+          <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">
+            {character.name || 'The Worldhopper'}
+          </p>
+        </div>
+        {onCloseSidebar && (
+          <button
+            type="button"
+            onClick={onCloseSidebar}
+            className="p-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 shrink-0 touch-manipulation"
+            aria-label="Close sidebar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* Character sheet: playbook, stats, starting move (collapsible) */}

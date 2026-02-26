@@ -5,6 +5,7 @@ import {
   spendAether,
   spendWards,
   applyActivity,
+  ACTIVITY_MINUTES_PER_UNIT,
   canAffordMove,
   spendSlipstream,
   spendStrikes,
@@ -153,15 +154,51 @@ describe('spendForEncounter', () => {
   });
 });
 
+describe('ACTIVITY_MINUTES_PER_UNIT', () => {
+  it('defines thresholds for each activity type', () => {
+    expect(ACTIVITY_MINUTES_PER_UNIT.cardio).toBe(20);
+    expect(ACTIVITY_MINUTES_PER_UNIT.strength).toBe(15);
+    expect(ACTIVITY_MINUTES_PER_UNIT.yoga).toBe(20);
+    expect(ACTIVITY_MINUTES_PER_UNIT.wellness).toBe(15);
+  });
+});
+
 describe('applyActivity', () => {
-  it('increments slipstream for cardio', () => {
+  it('increments slipstream for cardio (no duration = 1 unit)', () => {
     expect(applyActivity(baseResources, 'cardio').slipstream).toBe(
       baseResources.slipstream + 1
     );
   });
-  it('increments aether for wellness', () => {
+  it('increments aether for wellness (no duration = 1 unit)', () => {
     expect(applyActivity(baseResources, 'wellness').aether).toBe(
       baseResources.aether + 1
+    );
+  });
+  it('grants units by duration when durationMinutes provided', () => {
+    // 40 min cardio = 2 slipstream
+    expect(applyActivity(baseResources, 'cardio', 40).slipstream).toBe(
+      baseResources.slipstream + 2
+    );
+    // 30 min strength = 2 strikes (15 min per unit)
+    expect(applyActivity(baseResources, 'strength', 30).strikes).toBe(
+      baseResources.strikes + 2
+    );
+    // 20 min yoga = 1 ward
+    expect(applyActivity(baseResources, 'yoga', 20).wards).toBe(
+      baseResources.wards + 1
+    );
+  });
+  it('grants 0 units when duration below threshold', () => {
+    expect(applyActivity(baseResources, 'cardio', 10).slipstream).toBe(
+      baseResources.slipstream
+    );
+    expect(applyActivity(baseResources, 'strength', 5).strikes).toBe(
+      baseResources.strikes
+    );
+  });
+  it('uses floor so partial threshold does not grant extra unit', () => {
+    expect(applyActivity(baseResources, 'cardio', 39).slipstream).toBe(
+      baseResources.slipstream + 1
     );
   });
 });

@@ -3,7 +3,7 @@
  * Supports migration from legacy character-only key.
  */
 
-import type { Character } from '@/types/character';
+import type { Character, Progression } from '@/types/character';
 import { getDefaultStartHexId } from '@/engine/encounter-placement';
 import { getAdjacentHexIds } from '@/engine/hex-math';
 
@@ -24,6 +24,10 @@ export interface MapState {
 export interface PersistedGameState {
   character: Character;
   mapState: MapState;
+  /** When true, level-up modal is shown on load; progression is at cap until user chooses reward. */
+  pendingLevelUp?: boolean;
+  /** Progression to apply after level-up choice (only when pendingLevelUp). */
+  pendingProgressionAfterLevelUp?: Progression;
 }
 
 export function getDefaultMapState(cols: number, rows: number): MapState {
@@ -59,11 +63,16 @@ export function loadGameState(cols: number, rows: number): PersistedGameState | 
   try {
     const raw = localStorage.getItem(GAME_STATE_KEY);
     if (raw) {
-      const data = JSON.parse(raw) as PersistedGameState;
+      const data = JSON.parse(raw) as PersistedGameState & { pendingLevelUp?: boolean; pendingProgressionAfterLevelUp?: Progression };
       if (data.character && data.mapState) {
         const c = data.character;
         if (c.name && c.playbook && c.startingMoveId && c.stats) {
-          return data;
+          return {
+            character: data.character,
+            mapState: data.mapState,
+            pendingLevelUp: data.pendingLevelUp ?? false,
+            pendingProgressionAfterLevelUp: data.pendingProgressionAfterLevelUp ?? undefined,
+          };
         }
       }
     }

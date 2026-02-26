@@ -57,6 +57,45 @@ export function applyEncounterReward(
 }
 
 /**
+ * Result of computing encounter reward when level-up flow is used:
+ * if leveledUp, progression is held at cap and caller should show level-up modal.
+ */
+export interface EncounterRewardResult {
+  /** Progression after adding gold only (xp held at cap if would level). */
+  progression: Progression;
+  /** True if this reward would level up (modal should be shown). */
+  leveledUp: boolean;
+  /** Progression to apply after user completes level-up choice (only when leveledUp). */
+  nextProgressionAfterLevelUp: Progression | null;
+}
+
+/**
+ * Compute encounter reward; when it would level up, return progression at cap
+ * and the progression to apply after level-up choice (for level-up flow).
+ */
+export function applyEncounterRewardWithLevelUpFlow(
+  current: Progression,
+  gold: number,
+  xpGain: number
+): EncounterRewardResult {
+  const withCurrency = addCurrency(current, gold);
+  const xpCap = getXpCap(withCurrency.level);
+  const wouldLevel = withCurrency.xp + xpGain >= xpCap;
+  if (wouldLevel) {
+    return {
+      progression: { ...withCurrency, xp: xpCap },
+      leveledUp: true,
+      nextProgressionAfterLevelUp: addXp(withCurrency, xpGain),
+    };
+  }
+  return {
+    progression: addXp(withCurrency, xpGain),
+    leveledUp: false,
+    nextProgressionAfterLevelUp: null,
+  };
+}
+
+/**
  * Spend currency (e.g. Nexus purchase). Returns new progression or null if insufficient.
  */
 export function spendCurrency(

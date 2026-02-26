@@ -1,4 +1,5 @@
 import type { NexusReward } from '@/types/campaign';
+import { useToast } from '@/contexts/ToastContext';
 
 interface RewardCardProps {
   reward: NexusReward;
@@ -7,13 +8,14 @@ interface RewardCardProps {
 }
 
 export function RewardCard({ reward, currency, onPurchase }: RewardCardProps) {
+  const { toast } = useToast();
   const canAfford = currency >= reward.cost;
 
   const handleClick = () => {
     if (canAfford) {
       onPurchase(reward);
     } else {
-      alert('Not enough Currency!');
+      toast('Not enough Currency!', 'error');
     }
   };
 

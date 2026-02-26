@@ -68,8 +68,20 @@ export function HexTile({
         stroke={stroke}
         strokeWidth="2"
         className={`transition-all duration-300 ${canClick ? 'cursor-pointer hover:opacity-80' : ''}`}
-        onClick={() => canClick && onMove(hex.q, hex.r, hex.id)}
+        style={canClick ? { touchAction: 'manipulation' } : undefined}
+        pointerEvents="none"
       />
+      {/* Larger transparent hit area for touch (min ~44px); receives clicks when clickable */}
+      {canClick && (
+        <circle
+          r="24"
+          fill="transparent"
+          className="cursor-pointer"
+          style={{ touchAction: 'manipulation' }}
+          onClick={() => onMove(hex.q, hex.r, hex.id)}
+          aria-label={`Move to hex ${hex.id}`}
+        />
+      )}
       {isRevealed && isRiftHex && !isCleared && (
         <text
           x="0"

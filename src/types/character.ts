@@ -55,6 +55,8 @@ export interface Character {
   name: string;
   playbook: PlaybookId;
   startingMoveId: string;
+  /** Move IDs learned on level-up (from same or other playbooks). */
+  learnedMoveIds?: string[];
   stats: CharacterStats;
   resources: CharacterResources;
   progression: Progression;
@@ -65,3 +67,9 @@ export interface Character {
 }
 
 export type ActivityType = 'cardio' | 'strength' | 'yoga' | 'wellness';
+
+/** Choice made in the level-up modal (new move, cross-class move, or +1 stat). */
+export type LevelUpChoice =
+  | { type: 'new_move'; moveId: string }
+  | { type: 'cross_class_move'; moveId: string }
+  | { type: 'stat'; stat: keyof CharacterStats };

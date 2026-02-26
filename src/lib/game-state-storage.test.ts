@@ -161,5 +161,24 @@ describe('game-state-storage', () => {
       expect(loaded!.character.name).toBe('FromNewKey');
       expect(loaded!.mapState.playerPos).toEqual({ q: 5, r: 5 });
     });
+
+    it('round-trip preserves pendingLevelUp and pendingProgressionAfterLevelUp', () => {
+      const mapState = getDefaultMapState(COLS, ROWS);
+      const state: PersistedGameState = {
+        character: { ...validCharacter, progression: { xp: 10, level: 1, currency: 100 } },
+        mapState,
+        pendingLevelUp: true,
+        pendingProgressionAfterLevelUp: { xp: 3, level: 2, currency: 100 },
+      };
+      saveGameState(state);
+      const loaded = loadGameState(COLS, ROWS);
+      expect(loaded).not.toBeNull();
+      expect(loaded!.pendingLevelUp).toBe(true);
+      expect(loaded!.pendingProgressionAfterLevelUp).toEqual({
+        xp: 3,
+        level: 2,
+        currency: 100,
+      });
+    });
   });
 });

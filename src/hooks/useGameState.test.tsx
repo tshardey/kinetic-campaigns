@@ -892,7 +892,7 @@ describe('useGameState', () => {
         maxHp: 5,
         resources: { slipstream: 5, strikes: 1, wards: 0, aether: 0 },
         inventory: [
-          { id: 'test-item', name: 'Test Loot', kind: 'consumable', description: null, image_url: null },
+          { id: 'test-item', name: 'Test Loot', kind: 'consumable' as const },
         ],
       };
       const twoStrikeEncounter = { type: 'basic' as const, name: 'Tough', strikes: 2, gold: 10 };

@@ -300,7 +300,8 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
               });
             }
           }
-          if (character.startingMoveId === 'aura-of-conquest') {
+          const startingMoveId: string = character.startingMoveId;
+          if (startingMoveId === 'aura-of-conquest') {
             setResources((r) => ({ ...r, wards: r.wards + 1 }));
           }
           setAnchorUses((prev) => {
@@ -488,7 +489,8 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
             });
           }
         }
-        if (character.startingMoveId === 'aura-of-conquest') {
+        const startingMoveId: string = character.startingMoveId;
+        if (startingMoveId === 'aura-of-conquest') {
           setResources((r) => ({ ...r, wards: r.wards + 1 }));
         }
         setAnchorUses((prev) => {

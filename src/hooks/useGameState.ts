@@ -87,7 +87,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
     return loaded?.character ?? null;
   });
 
-  const defaultMap = getDefaultMapState(cols, rows);
+  const defaultMap = getDefaultMapState(cols, rows, campaign.realm.startingHex);
   const [resources, setResources] = useState<CharacterResources>(() => {
     const loaded = loadGameState(cols, rows);
     return loaded?.character?.resources ?? DEFAULT_RESOURCES;
@@ -143,7 +143,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
       setCharacterState((prev) => {
         if (next && !prev) {
           // First time character set (e.g. after creation): init map state to default
-          const def = getDefaultMapState(cols, rows);
+          const def = getDefaultMapState(cols, rows, campaign.realm.startingHex);
           setPlayerPos(def.playerPos);
           setRevealedHexes(new Set(def.revealedHexes));
           setClearedHexes(new Set(def.clearedHexes));
@@ -403,9 +403,13 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
           return { ...prev, hp: prev.maxHp ?? 5 };
         });
         if (wouldBeZeroHp) {
-          const startHexId = getDefaultStartHexId(cols, rows);
-          const [q, r] = startHexId.split(',').map(Number);
-          setPlayerPos({ q, r });
+          const start =
+            campaign.realm.startingHex ?? (() => {
+              const startHexId = getDefaultStartHexId(cols, rows);
+              const [q, r] = startHexId.split(',').map(Number);
+              return { q, r };
+            })();
+          setPlayerPos(start);
           setProgression((p) => ({ ...p, currency: Math.max(0, p.currency - 50) }));
         }
       }
@@ -616,14 +620,15 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
     [resources, character]
   );
 
-  const purchaseReward = useCallback((reward: NexusReward) => {
-    setProgression((prev) => {
-      const next = spendCurrency(prev, reward.cost);
-      if (!next) return prev;
+  const purchaseReward = useCallback(
+    (reward: NexusReward) => {
+      const next = spendCurrency(progression, reward.cost);
+      if (!next) return;
+      setProgression(next);
       notify(`Purchased ${reward.title}! Go treat yourself.`, 'info');
-      return next;
-    });
-  }, [notify]);
+    },
+    [notify, progression]
+  );
 
   const completeLevelUp = useCallback((choice: LevelUpChoice) => {
     setPendingProgressionAfterLevelUp((nextProg) => {

@@ -41,8 +41,12 @@ interface HexGridProps {
   character: Character | null;
   lootFrameUrl: string;
   resources?: CharacterResources;
+  /** Nexus Tent (starting hex). When set, that hex shows tent icon and onOpenNexus is called on click. */
+  startingHex?: { q: number; r: number };
   onMove: (q: number, r: number, id: string) => void;
   onEngageEncounter: (hexId: string, encounter: MapEncounter, options?: { phaseStrike?: boolean }) => void;
+  /** When the Nexus Tent hex is clicked, open the Nexus UI (e.g. switch to Nexus tab). */
+  onOpenNexus?: () => void;
   useDimensionalAnchor?: (hexId: string) => boolean;
   onScoutHex?: (hexId: string) => boolean;
   onAttemptRiftStage: (hexId: string, riftId: string, stageIndex: number) => boolean;
@@ -66,7 +70,9 @@ export function HexGrid({
   character,
   lootFrameUrl,
   resources,
+  startingHex,
   onMove,
+  onOpenNexus,
   onEngageEncounter,
   useDimensionalAnchor,
   onScoutHex,
@@ -136,6 +142,8 @@ export function HexGrid({
               resources.aether >= 1 &&
               !revealedHexes.has(hex.id) &&
               hexDistance(playerPos, { q: hex.q, r: hex.r }) === 2;
+            const isNexusHex =
+              !!startingHex && hex.q === startingHex.q && hex.r === startingHex.r;
             return (
               <HexTile
                 key={hex.id}
@@ -149,7 +157,9 @@ export function HexGrid({
                 encounter={encounters[hex.id]}
                 isCleared={clearedHexes.has(hex.id)}
                 isRiftHex={hex.id in placedRifts}
+                isNexusHex={isNexusHex}
                 onMove={onMove}
+                onOpenNexus={onOpenNexus}
                 isScoutable={isScoutable}
                 onScout={isScoutable ? () => onScoutHex(hex.id) : undefined}
               />

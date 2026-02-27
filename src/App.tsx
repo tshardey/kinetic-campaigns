@@ -161,7 +161,9 @@ function App() {
               character={character}
               lootFrameUrl={campaign.realm.loot_frame_url}
               resources={resources}
+              startingHex={campaign.realm.startingHex}
               onMove={movePlayer}
+              onOpenNexus={() => setActiveTab('nexus')}
               onEngageEncounter={engageEncounter}
               useDimensionalAnchor={useDimensionalAnchor}
               onScoutHex={onScoutHex}

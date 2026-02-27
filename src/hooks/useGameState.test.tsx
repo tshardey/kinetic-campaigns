@@ -76,7 +76,7 @@ describe('useGameState', () => {
   });
 
   it('initializes map state from default when no save exists', () => {
-    const defaultMap = getDefaultMapState(COLS, ROWS);
+    const defaultMap = getDefaultMapState(COLS, ROWS, campaign.realm.startingHex);
     const { result } = renderHook(() =>
       useGameState({ cols: COLS, rows: ROWS, campaign })
     );
@@ -100,7 +100,9 @@ describe('useGameState', () => {
     expect(result.current.character).not.toBeNull();
     expect(result.current.character!.name).toBe(validCharacter.name);
     expect(result.current.resources).toEqual(validCharacter.resources);
-    const startHexId = getDefaultStartHexId(COLS, ROWS);
+    const startHexId = campaign.realm.startingHex
+      ? `${campaign.realm.startingHex.q},${campaign.realm.startingHex.r}`
+      : getDefaultStartHexId(COLS, ROWS);
     expect(result.current.revealedHexes.has(startHexId)).toBe(true);
     expect(result.current.clearedHexes.size).toBe(0);
   });
@@ -982,7 +984,7 @@ describe('useGameState', () => {
     };
 
     it('spends 1 Aether and adds hex to revealedHexes when hex is at distance 2', () => {
-      const defaultMap = getDefaultMapState(COLS, ROWS);
+      const defaultMap = getDefaultMapState(COLS, ROWS, campaign.realm.startingHex);
       const { q, r } = defaultMap.playerPos;
       const ring2 = getHexIdsAtDistance(q, r, 2);
       expect(ring2.length).toBeGreaterThan(0);
@@ -1007,7 +1009,7 @@ describe('useGameState', () => {
     });
 
     it('returns false and notifies when not Wayfinder with Scout the Multiverse', () => {
-      const defaultMap = getDefaultMapState(COLS, ROWS);
+      const defaultMap = getDefaultMapState(COLS, ROWS, campaign.realm.startingHex);
       const ring2 = getHexIdsAtDistance(defaultMap.playerPos.q, defaultMap.playerPos.r, 2);
       const hexId = ring2[0];
       const toast = vi.fn();
@@ -1027,7 +1029,7 @@ describe('useGameState', () => {
     });
 
     it('returns false when insufficient Aether', () => {
-      const defaultMap = getDefaultMapState(COLS, ROWS);
+      const defaultMap = getDefaultMapState(COLS, ROWS, campaign.realm.startingHex);
       const ring2 = getHexIdsAtDistance(defaultMap.playerPos.q, defaultMap.playerPos.r, 2);
       const hexId = ring2[0];
       const toast = vi.fn();
@@ -1067,7 +1069,7 @@ describe('useGameState', () => {
     });
 
     it('returns false when hex is already revealed and does not spend Aether', () => {
-      const defaultMap = getDefaultMapState(COLS, ROWS);
+      const defaultMap = getDefaultMapState(COLS, ROWS, campaign.realm.startingHex);
       const ring2 = getHexIdsAtDistance(defaultMap.playerPos.q, defaultMap.playerPos.r, 2);
       const hexId = ring2[0];
       const toast = vi.fn();

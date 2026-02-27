@@ -14,7 +14,11 @@ interface HexTileProps {
   isCleared: boolean;
   /** True when this hex is a narrative rift entrance (show rift marker when revealed). */
   isRiftHex?: boolean;
+  /** True when this hex is the Nexus Tent (starting hex); show tent icon and open Nexus on click. */
+  isNexusHex?: boolean;
   onMove: (q: number, r: number, id: string) => void;
+  /** When Nexus hex is clicked, open the Nexus Tent UI instead of moving. */
+  onOpenNexus?: () => void;
   /** Scout the Multiverse: hex is in next ring (distance 2), not yet revealed; click to reveal. */
   isScoutable?: boolean;
   onScout?: () => void;
@@ -38,7 +42,9 @@ export function HexTile({
   encounter,
   isCleared,
   isRiftHex = false,
+  isNexusHex = false,
   onMove,
+  onOpenNexus,
   isScoutable = false,
   onScout,
 }: HexTileProps) {
@@ -66,8 +72,9 @@ export function HexTile({
     }
   }
 
-  const canMove = isRevealed && !isPlayerHere;
+  const canMove = isRevealed && !isPlayerHere && !isNexusHex;
   const canScout = isScoutable && onScout;
+  const canOpenNexus = isNexusHex && isRevealed && onOpenNexus;
 
   return (
     <g transform={`translate(${pixelX}, ${pixelY}) scale(${scale})`}>
@@ -77,8 +84,8 @@ export function HexTile({
         fillOpacity={fillOpacity}
         stroke={stroke}
         strokeWidth="2"
-        className={`transition-all duration-300 ${canMove || canScout ? 'cursor-pointer hover:opacity-80' : ''}`}
-        style={canMove || canScout ? { touchAction: 'manipulation' } : undefined}
+        className={`transition-all duration-300 ${canMove || canScout || canOpenNexus ? 'cursor-pointer hover:opacity-80' : ''}`}
+        style={canMove || canScout || canOpenNexus ? { touchAction: 'manipulation' } : undefined}
         pointerEvents="none"
       />
       {/* Larger transparent hit area for touch (min ~44px); receives clicks when clickable */}
@@ -95,7 +102,20 @@ export function HexTile({
           aria-label={`Scout hex ${hex.id}`}
         />
       )}
-      {canMove && !canScout && (
+      {canOpenNexus && (
+        <circle
+          r="24"
+          fill="transparent"
+          className="cursor-pointer"
+          style={{ touchAction: 'manipulation' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenNexus?.();
+          }}
+          aria-label="Open Nexus Tent"
+        />
+      )}
+      {canMove && !canScout && !canOpenNexus && (
         <circle
           r="24"
           fill="transparent"
@@ -105,7 +125,19 @@ export function HexTile({
           aria-label={`Move to hex ${hex.id}`}
         />
       )}
-      {isRevealed && isRiftHex && !isCleared && (
+      {isRevealed && isNexusHex && (
+        <text
+          x="0"
+          y="5"
+          textAnchor="middle"
+          fill="white"
+          fontSize="16"
+          pointerEvents="none"
+        >
+          ⛺
+        </text>
+      )}
+      {isRevealed && isRiftHex && !isCleared && !isNexusHex && (
         <text
           x="0"
           y="5"
@@ -129,7 +161,7 @@ export function HexTile({
           🔭
         </text>
       )}
-      {isRevealed && !isRiftHex && !isScoutable && encounter && !isCleared && (
+      {isRevealed && !isRiftHex && !isNexusHex && !isScoutable && encounter && !isCleared && (
         <text
           x="0"
           y="5"

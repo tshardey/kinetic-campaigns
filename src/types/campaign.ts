@@ -13,6 +13,8 @@ export interface Realm {
   grid_cols?: number;
   /** Rectangular grid rows. Use with grid_cols. */
   grid_rows?: number;
+  /** Nexus Tent hex (player start); used for knockback and map indicator. */
+  startingHex?: { q: number; r: number };
   hero_image_url: string;
   map_background_url: string;
   loot_frame_url: string;

@@ -38,9 +38,20 @@ export interface PersistedGameState {
   pendingProgressionAfterLevelUp?: Progression;
 }
 
-export function getDefaultMapState(cols: number, rows: number): MapState {
-  const startHexId = getDefaultStartHexId(cols, rows);
-  const [q, r] = startHexId.split(',').map(Number);
+export function getDefaultMapState(
+  cols: number,
+  rows: number,
+  startingHex?: { q: number; r: number }
+): MapState {
+  const q = startingHex?.q ?? (() => {
+    const startHexId = getDefaultStartHexId(cols, rows);
+    return Number(startHexId.split(',')[0]);
+  })();
+  const r = startingHex?.r ?? (() => {
+    const startHexId = getDefaultStartHexId(cols, rows);
+    return Number(startHexId.split(',')[1]);
+  })();
+  const startHexId = `${q},${r}`;
   const revealed = new Set<string>([startHexId]);
   getAdjacentHexIds(q, r).forEach((id) => revealed.add(id));
   return {

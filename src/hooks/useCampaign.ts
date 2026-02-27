@@ -35,7 +35,9 @@ export function useCampaign(): CampaignState {
     const cols = campaign.realm.grid_cols ?? 14;
     const rows = campaign.realm.grid_rows ?? 9;
     const grid = generateRectGrid(cols, rows);
-    const startHexId = getDefaultStartHexId(cols, rows);
+    const startHexId = campaign.realm.startingHex
+      ? `${campaign.realm.startingHex.q},${campaign.realm.startingHex.r}`
+      : getDefaultStartHexId(cols, rows);
     const placedRifts = placeRifts(
       { grid, cols, rows, seed: PLACEMENT_SEED, startHexId },
       campaign

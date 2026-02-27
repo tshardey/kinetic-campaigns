@@ -25,6 +25,7 @@ const realm: Realm = {
   grid_radius: 4,
   grid_cols: 14,
   grid_rows: 9,
+  startingHex: { q: -1, r: 4 },
   hero_image_url: `${CAMPAIGN_BASE}/background/adventure-hero.png`,
   map_background_url: `${CAMPAIGN_BASE}/background/map-background.png`,
   loot_frame_url: `${CAMPAIGN_BASE}/loot/loot-frame.png`,

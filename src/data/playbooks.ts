@@ -93,18 +93,21 @@ export const PLAYBOOKS: PlaybookDefinition[] = [
   },
 ];
 
-const DEFAULT_RESOURCES: CharacterResources = {
-  slipstream: 5,
-  strikes: 2,
-  wards: 0,
-  aether: 1,
-};
-
 const DEFAULT_PROGRESSION: Progression = {
   xp: 0,
   level: 1,
-  currency: 120,
+  currency: 0,
 };
+
+/** Starting resources derived from playbook stats with a base of 0 (stats map: haste→slipstream, brawn→strikes, flow→wards, focus→aether). */
+function getStartingResourcesFromStats(stats: PlaybookDefinition['stats']): CharacterResources {
+  return {
+    slipstream: Math.max(0, stats.haste),
+    strikes: Math.max(0, stats.brawn),
+    wards: Math.max(0, stats.flow),
+    aether: Math.max(0, stats.focus),
+  };
+}
 
 export function getPlaybook(id: string): PlaybookDefinition | undefined {
   return PLAYBOOKS.find((p) => p.id === id);
@@ -123,12 +126,15 @@ export function buildCharacter(
   const move = playbook.startingMoves.find((m) => m.id === startingMoveId);
   if (!move) throw new Error(`Unknown starting move: ${startingMoveId} for playbook ${playbookId}`);
 
+  const stats = { ...playbook.stats };
+  const resources = getStartingResourcesFromStats(playbook.stats);
+
   return {
     name: name.trim() || 'Worldhopper',
     playbook: playbook.id,
     startingMoveId: move.id,
-    stats: { ...playbook.stats },
-    resources: { ...DEFAULT_RESOURCES },
+    stats,
+    resources,
     progression: { ...DEFAULT_PROGRESSION },
     hp: 5,
     maxHp: 5,

@@ -4,7 +4,6 @@ import type { Character, CharacterResources, Progression, InventoryItem } from '
 import type { ActivityType } from '@/types/character';
 import { getXpCap } from '@/engine/progression';
 import { getPlaybook } from '@/data/playbooks';
-import { consumableRequiresChoice } from '@/engine/inventory';
 import { ResourceDisplay } from './ResourceDisplay';
 import { ActivityLogger } from './ActivityLogger';
 
@@ -14,7 +13,7 @@ interface CharacterPanelProps {
   resources: CharacterResources;
   inventory: InventoryItem[];
   onLogActivity: (type: ActivityType, durationMinutes?: number) => void;
-  onUseConsumable: (item: InventoryItem, choice?: 'haste' | 'flow') => void;
+  onUseConsumable: (item: InventoryItem) => void;
   /** Spend 1 Aether per 1 HP (capped at maxHp). Called with amount to heal; returns true if any healing applied. */
   onHeal?: (amount: number) => boolean;
   /** When set, show a close button (e.g. for mobile overlay). */
@@ -33,7 +32,6 @@ export function CharacterPanel({
 }: CharacterPanelProps) {
   const [sheetExpanded, setSheetExpanded] = useState(true);
   const [inventoryExpanded, setInventoryExpanded] = useState(true);
-  const [vialChoiceFor, setVialChoiceFor] = useState<string | null>(null);
   const xpCap = getXpCap(progression.level);
   const xpPercent = (progression.xp / xpCap) * 100;
   const playbook = getPlaybook(character.playbook);
@@ -220,49 +218,13 @@ export function CharacterPanel({
                       )}
                       {item.kind === 'consumable' && (
                         <div className="mt-1.5 flex flex-wrap gap-1">
-                          {vialChoiceFor === item.id ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  onUseConsumable(item, 'haste');
-                                  setVialChoiceFor(null);
-                                }}
-                                className="text-xs bg-amber-600 hover:bg-amber-500 text-white px-2 py-1 rounded"
-                              >
-                                Restore Haste
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  onUseConsumable(item, 'flow');
-                                  setVialChoiceFor(null);
-                                }}
-                                className="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded"
-                              >
-                                Restore Flow
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setVialChoiceFor(null)}
-                                className="text-xs text-slate-400 hover:text-slate-300"
-                              >
-                                Cancel
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                consumableRequiresChoice(item.id)
-                                  ? setVialChoiceFor(item.id)
-                                  : onUseConsumable(item)
-                              }
-                              className="text-xs bg-teal-600 hover:bg-teal-500 text-white px-2 py-1 rounded"
-                            >
-                              Use
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => onUseConsumable(item)}
+                            className="text-xs bg-teal-600 hover:bg-teal-500 text-white px-2 py-1 rounded"
+                          >
+                            Use
+                          </button>
                         </div>
                       )}
                     </div>

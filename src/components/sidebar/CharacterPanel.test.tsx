@@ -119,18 +119,7 @@ describe('CharacterPanel', () => {
       );
     });
 
-    it('shows Restore Haste and Restore Flow when Use is clicked for Vial of Sun-Catch', () => {
-      const inventory: InventoryItem[] = [
-        { id: 'vial-of-sun-catch', name: 'Vial of Sun-Catch', kind: 'consumable' },
-      ];
-      render(<CharacterPanel {...defaultProps} inventory={inventory} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Use' }));
-      expect(screen.getByRole('button', { name: 'Restore Haste' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Restore Flow' })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    });
-
-    it('calls onUseConsumable with choice when Restore Haste is clicked for Vial', () => {
+    it('calls onUseConsumable when Use is clicked for Vial of Sun-Catch', () => {
       const onUseConsumable = vi.fn();
       const inventory: InventoryItem[] = [
         { id: 'vial-of-sun-catch', name: 'Vial of Sun-Catch', kind: 'consumable' },
@@ -139,26 +128,9 @@ describe('CharacterPanel', () => {
         <CharacterPanel {...defaultProps} inventory={inventory} onUseConsumable={onUseConsumable} />
       );
       fireEvent.click(screen.getByRole('button', { name: 'Use' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Restore Haste' }));
+      expect(onUseConsumable).toHaveBeenCalledTimes(1);
       expect(onUseConsumable).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'vial-of-sun-catch' }),
-        'haste'
-      );
-    });
-
-    it('calls onUseConsumable with choice when Restore Flow is clicked for Vial', () => {
-      const onUseConsumable = vi.fn();
-      const inventory: InventoryItem[] = [
-        { id: 'vial-of-sun-catch', name: 'Vial of Sun-Catch', kind: 'consumable' },
-      ];
-      render(
-        <CharacterPanel {...defaultProps} inventory={inventory} onUseConsumable={onUseConsumable} />
-      );
-      fireEvent.click(screen.getByRole('button', { name: 'Use' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Restore Flow' }));
-      expect(onUseConsumable).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'vial-of-sun-catch' }),
-        'flow'
+        expect.objectContaining({ id: 'vial-of-sun-catch', kind: 'consumable' })
       );
     });
 

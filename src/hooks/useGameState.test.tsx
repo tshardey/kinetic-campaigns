@@ -1,12 +1,12 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useGameState } from './useGameState';
 import { saveGameState, getDefaultMapState } from '@/lib/game-state-storage';
 import type { Character } from '@/types/character';
-import type { CampaignPackage } from '@/types/campaign';
+import type { CampaignPackage, MapEncounter } from '@/types/campaign';
 import { omijaCampaign } from '@/data/omija';
 import { getDefaultStartHexId } from '@/engine/encounter-placement';
 
@@ -55,6 +55,11 @@ describe('useGameState', () => {
   beforeEach(() => {
     mockStorage = createMockStorage();
     vi.stubGlobal('localStorage', mockStorage);
+    vi.spyOn(Math, 'random').mockReturnValue(0.99);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('returns null character and default resources when no save exists', () => {
@@ -593,7 +598,7 @@ describe('useGameState', () => {
     });
 
     it('blocks boss attack when not all elites defeated and notifies', () => {
-      const placedEncounters: Record<string, { type: string; id?: string; name: string; strikes: number; gold: number }> = {
+      const placedEncounters: Record<string, MapEncounter> = {
         '1,1': { ...eliteEncounter },
         '2,2': { ...eliteEncounter, id: 'master-of-the-crag', name: 'Master of the Crag' },
         '3,3': bossEncounter,
@@ -619,7 +624,7 @@ describe('useGameState', () => {
     });
 
     it('blocks boss attack when rift is not fully closed and notifies', () => {
-      const placedEncounters: Record<string, { type: string; id?: string; name: string; strikes: number; gold: number }> = {
+      const placedEncounters: Record<string, MapEncounter> = {
         '1,1': { ...eliteEncounter },
         '2,2': { ...eliteEncounter, id: 'master-of-the-crag', name: 'Master of the Crag' },
         '3,3': bossEncounter,
@@ -644,7 +649,7 @@ describe('useGameState', () => {
     });
 
     it('allows boss attack when all elites defeated and rift closed, and sets campaignStatus to victory on boss defeat', () => {
-      const placedEncounters: Record<string, { type: string; id?: string; name: string; strikes: number; gold: number }> = {
+      const placedEncounters: Record<string, MapEncounter> = {
         '1,1': { ...eliteEncounter },
         '2,2': { ...eliteEncounter, id: 'master-of-the-crag', name: 'Master of the Crag' },
         '3,3': { ...eliteEncounter, id: 'echo-forgotten-shogun', name: 'Echo of the Forgotten Shogun' },

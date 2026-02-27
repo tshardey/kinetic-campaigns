@@ -56,7 +56,7 @@ export interface GameStateHookResult {
   movePlayer: (q: number, r: number, id: string) => void;
   engageEncounter: (hexId: string, encounter: MapEncounter) => void;
   attemptRiftStage: (hexId: string, riftId: string, stageIndex: number) => boolean;
-  useConsumable: (item: InventoryItem, choice?: 'haste' | 'flow') => void;
+  useConsumable: (item: InventoryItem) => void;
   /** Spend 1 Aether per 1 HP restored (capped at maxHp). Returns true if any healing applied. */
   heal: (amount: number) => boolean;
   purchaseReward: (reward: NexusReward) => void;
@@ -318,9 +318,9 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
     ]
   );
 
-  const useConsumable = useCallback((item: InventoryItem, choice?: 'haste' | 'flow') => {
+  const useConsumable = useCallback((item: InventoryItem) => {
     if (item.kind !== 'consumable') return;
-    const effect = getConsumableEffect(item.id, choice);
+    const effect = getConsumableEffect(item.id);
     if (!effect) return;
     setInventory((prev) => {
       const idx = prev.findIndex((i) => i.id === item.id);
@@ -335,6 +335,9 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
     if (effect.addSlipstream) {
       setResources((r) => ({ ...r, slipstream: r.slipstream + effect.addSlipstream! }));
     }
+    if (effect.addWards) {
+      setResources((r) => ({ ...r, wards: r.wards + effect.addWards! }));
+    }
     if (effect.statDelta) {
       setCharacterState((prev) => {
         if (!prev) return null;
@@ -345,9 +348,6 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         if (effect.statDelta!.focus) newStats.focus += effect.statDelta!.focus;
         return { ...prev, stats: newStats };
       });
-    }
-    if (effect.parasolShieldActive !== undefined) {
-      setCharacterState((prev) => (prev ? { ...prev, parasolShieldActive: effect.parasolShieldActive } : null));
     }
   }, []);
 

@@ -35,27 +35,17 @@ describe('applyArtifactOnAcquisition', () => {
 });
 
 describe('getConsumableEffect', () => {
-  it('returns stat delta for vial-of-sun-catch with haste choice', () => {
-    const result = getConsumableEffect('vial-of-sun-catch', 'haste');
-    expect(result).toEqual({ statDelta: { haste: 1 } });
+  it('returns addSlipstream 2 for vial-of-sun-catch', () => {
+    const result = getConsumableEffect('vial-of-sun-catch');
+    expect(result).toEqual({ addSlipstream: 2 });
   });
 
-  it('returns stat delta for vial-of-sun-catch with flow choice', () => {
-    const result = getConsumableEffect('vial-of-sun-catch', 'flow');
-    expect(result).toEqual({ statDelta: { flow: 1 } });
-  });
-
-  it('returns null for vial-of-sun-catch without choice', () => {
-    expect(getConsumableEffect('vial-of-sun-catch')).toBeNull();
-    expect(getConsumableEffect('vial-of-sun-catch', undefined)).toBeNull();
-  });
-
-  it('returns parasolShieldActive for iron-silk-parasol', () => {
+  it('returns addWards 1 for iron-silk-parasol', () => {
     const result = getConsumableEffect('iron-silk-parasol');
-    expect(result).toEqual({ parasolShieldActive: true });
+    expect(result).toEqual({ addWards: 1 });
   });
 
-  it('returns addStrikes for memory-censer', () => {
+  it('returns addStrikes 1 for memory-censer', () => {
     const result = getConsumableEffect('memory-censer');
     expect(result).toEqual({ addStrikes: 1 });
   });
@@ -67,16 +57,10 @@ describe('getConsumableEffect', () => {
 });
 
 describe('consumableRequiresChoice', () => {
-  it('returns true for vial-of-sun-catch', () => {
-    expect(consumableRequiresChoice('vial-of-sun-catch')).toBe(true);
-  });
-
-  it('returns false for other consumables', () => {
+  it('returns false for all items (no consumable requires choice)', () => {
+    expect(consumableRequiresChoice('vial-of-sun-catch')).toBe(false);
     expect(consumableRequiresChoice('iron-silk-parasol')).toBe(false);
     expect(consumableRequiresChoice('memory-censer')).toBe(false);
-  });
-
-  it('returns false for artifact and unknown ids', () => {
     expect(consumableRequiresChoice('talon-of-the-west-wind')).toBe(false);
     expect(consumableRequiresChoice('unknown')).toBe(false);
   });
@@ -88,7 +72,7 @@ describe('lootDropToInventoryItem', () => {
       id: 'vial-of-sun-catch',
       name: 'Vial of Sun-Catch',
       kind: 'consumable',
-      description: 'Use: Instantly restores 1 Haste or 1 Flow.',
+      description: 'Use: Grants +2 Slipstream.',
       image_url: '/path/to/vial.png',
     };
     const item = lootDropToInventoryItem(drop);
@@ -96,7 +80,7 @@ describe('lootDropToInventoryItem', () => {
       id: 'vial-of-sun-catch',
       name: 'Vial of Sun-Catch',
       kind: 'consumable',
-      description: 'Use: Instantly restores 1 Haste or 1 Flow.',
+      description: 'Use: Grants +2 Slipstream.',
       image_url: '/path/to/vial.png',
     });
   });

@@ -10,8 +10,8 @@ import type { EncounterLootDrop } from '@/types/campaign';
 export interface ConsumableResult {
   addStrikes?: number;
   addSlipstream?: number;
+  addWards?: number;
   statDelta?: Partial<CharacterStats>;
-  parasolShieldActive?: boolean;
 }
 
 /**
@@ -32,19 +32,13 @@ export function applyArtifactOnAcquisition(
 
 /**
  * Get the consumable effect for an item. Caller applies deltas and removes item from inventory.
- * For vial-of-sun-catch, pass choice 'haste' or 'flow'.
  */
-export function getConsumableEffect(
-  itemId: string,
-  choice?: 'haste' | 'flow'
-): ConsumableResult | null {
+export function getConsumableEffect(itemId: string): ConsumableResult | null {
   switch (itemId) {
     case 'vial-of-sun-catch':
-      if (choice === 'haste') return { statDelta: { haste: 1 } };
-      if (choice === 'flow') return { statDelta: { flow: 1 } };
-      return null;
+      return { addSlipstream: 2 };
     case 'iron-silk-parasol':
-      return { parasolShieldActive: true };
+      return { addWards: 1 };
     case 'memory-censer':
       return { addStrikes: 1 };
     default:
@@ -55,8 +49,8 @@ export function getConsumableEffect(
 /**
  * Whether this consumable requires a choice (e.g. Haste vs Flow) before use.
  */
-export function consumableRequiresChoice(itemId: string): boolean {
-  return itemId === 'vial-of-sun-catch';
+export function consumableRequiresChoice(_itemId: string): boolean {
+  return false;
 }
 
 /** Convert campaign loot drop to inventory item. */

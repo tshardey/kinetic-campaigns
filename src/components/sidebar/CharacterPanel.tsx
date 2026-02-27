@@ -16,6 +16,8 @@ interface CharacterPanelProps {
   onUseConsumable: (item: InventoryItem) => void;
   /** Spend 1 Aether per 1 HP (capped at maxHp). Called with amount to heal; returns true if any healing applied. */
   onHeal?: (amount: number) => boolean;
+  /** Nexus Synthesizer (Rift-Weaver): spend 2 Aether to restore 3 HP. Returns true if used. */
+  onNexusSynthesizerHeal?: () => boolean;
   /** When set, show a close button (e.g. for mobile overlay). */
   onCloseSidebar?: () => void;
 }
@@ -28,6 +30,7 @@ export function CharacterPanel({
   onLogActivity,
   onUseConsumable,
   onHeal,
+  onNexusSynthesizerHeal,
   onCloseSidebar,
 }: CharacterPanelProps) {
   const [sheetExpanded, setSheetExpanded] = useState(true);
@@ -134,7 +137,7 @@ export function CharacterPanel({
               </div>
             </div>
             {onHeal && (character.hp ?? 5) < (character.maxHp ?? 5) && resources.aether >= 1 && (
-              <div className="pt-2">
+              <div className="pt-2 space-y-2">
                 <button
                   type="button"
                   onClick={() => onHeal(1)}
@@ -142,6 +145,18 @@ export function CharacterPanel({
                 >
                   Heal (1 Aether → 1 HP)
                 </button>
+                {onNexusSynthesizerHeal &&
+                  character.startingMoveId === 'nexus-synthesizer' &&
+                  resources.aether >= 2 &&
+                  (character.hp ?? 5) < (character.maxHp ?? 5) && (
+                    <button
+                      type="button"
+                      onClick={() => onNexusSynthesizerHeal()}
+                      className="w-full text-xs bg-sky-600 hover:bg-sky-500 text-white font-medium py-2 px-3 rounded-lg transition-colors border border-sky-500/50"
+                    >
+                      Nexus Synthesizer (2 Aether → 3 HP)
+                    </button>
+                  )}
               </div>
             )}
             {startingMove && (

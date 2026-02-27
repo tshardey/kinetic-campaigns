@@ -10,6 +10,7 @@ import {
   generateGrid,
   hexDistance,
   getAdjacentHexIds,
+  getHexIdsAtDistance,
 } from './hex-math';
 
 describe('offsetToAxial / axialToOffset', () => {
@@ -157,5 +158,33 @@ describe('getAdjacentHexIds', () => {
     expect(ids).toHaveLength(6);
     expect(ids).toContain('1,0');
     expect(ids).toContain('0,1');
+  });
+});
+
+describe('getHexIdsAtDistance', () => {
+  it('returns empty array for distance <= 0', () => {
+    expect(getHexIdsAtDistance(0, 0, 0)).toEqual([]);
+    expect(getHexIdsAtDistance(0, 0, -1)).toEqual([]);
+  });
+
+  it('returns same as getAdjacentHexIds for distance 1', () => {
+    const adj = getAdjacentHexIds(0, 0);
+    const at1 = getHexIdsAtDistance(0, 0, 1);
+    expect(at1).toHaveLength(6);
+    expect(at1.sort()).toEqual([...adj].sort());
+  });
+
+  it('returns hexes at exactly distance 2 (next ring)', () => {
+    const at2 = getHexIdsAtDistance(0, 0, 2);
+    expect(at2.length).toBeGreaterThan(0);
+    at2.forEach((id) => {
+      const [q, r] = id.split(',').map(Number);
+      expect(hexDistance({ q: 0, r: 0 }, { q, r })).toBe(2);
+    });
+    // (0,0) adjacent are distance 1, so none of those
+    const adj = getAdjacentHexIds(0, 0);
+    at2.forEach((id) => {
+      expect(adj).not.toContain(id);
+    });
   });
 });

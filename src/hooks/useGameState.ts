@@ -11,7 +11,7 @@ import type { CampaignPackage } from '@/types/campaign';
 import type { RiftProgress, CampaignStatus } from '@/lib/game-state-storage';
 import { applyActivity, canAffordMove, spendSlipstream, canAffordEncounter, spendForEncounter, spendStrikes, spendWards, spendAether } from '@/engine/resources';
 import { applyEncounterRewardWithLevelUpFlow, spendCurrency, addCurrency } from '@/engine/progression';
-import { getAdjacentHexIds } from '@/engine/hex-math';
+import { getAdjacentHexIds, getHexIdsAtDistance } from '@/engine/hex-math';
 import { getDefaultStartHexId } from '@/engine/encounter-placement';
 import { applyArtifactOnAcquisition, getConsumableEffect, lootDropToInventoryItem } from '@/engine/inventory';
 import { canAffordRiftStage, spendForRiftStage } from '@/engine/rift';
@@ -47,6 +47,9 @@ export interface GameStateHookResult {
   setClearedHexes: React.Dispatch<React.SetStateAction<Set<string>>>;
   encounterHealth: Record<string, number>;
   setEncounterHealth: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  /** Per-encounter: whether Dimensional Anchor was used (hexId -> true). */
+  anchorUses: Record<string, boolean>;
+  setAnchorUses: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   justClearedHexId: string | null;
   setJustClearedHexId: React.Dispatch<React.SetStateAction<string | null>>;
   riftProgress: RiftProgress;
@@ -54,7 +57,13 @@ export interface GameStateHookResult {
   campaignStatus: CampaignStatus;
   logWorkout: (type: ActivityType, durationMinutes?: number) => void;
   movePlayer: (q: number, r: number, id: string) => void;
-  engageEncounter: (hexId: string, encounter: MapEncounter) => void;
+  engageEncounter: (hexId: string, encounter: MapEncounter, options?: { phaseStrike?: boolean }) => void;
+  /** Spend 2 Aether to reduce Elite/Boss required strikes by 1 (once per encounter). Returns true if used. */
+  useDimensionalAnchor: (hexId: string) => boolean;
+  /** Spend 2 Aether to restore 3 HP (Nexus Synthesizer move). Returns true if used. */
+  nexusSynthesizerHeal: () => boolean;
+  /** Spend 1 Aether to reveal a hex in the next ring (2 steps away) without moving (Scout the Multiverse). Returns true if revealed. */
+  onScoutHex: (hexId: string) => boolean;
   attemptRiftStage: (hexId: string, riftId: string, stageIndex: number) => boolean;
   useConsumable: (item: InventoryItem) => void;
   /** Spend 1 Aether per 1 HP restored (capped at maxHp). Returns true if any healing applied. */
@@ -107,6 +116,10 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
     const loaded = loadGameState(cols, rows);
     return loaded?.mapState?.encounterHealth ?? defaultMap.encounterHealth ?? {};
   });
+  const [anchorUses, setAnchorUses] = useState<Record<string, boolean>>(() => {
+    const loaded = loadGameState(cols, rows);
+    return loaded?.mapState?.anchorUses ?? defaultMap.anchorUses ?? {};
+  });
   const [justClearedHexId, setJustClearedHexId] = useState<string | null>(null);
   const [riftProgress, setRiftProgress] = useState<RiftProgress>(() => {
     const loaded = loadGameState(cols, rows);
@@ -135,6 +148,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
           setRevealedHexes(new Set(def.revealedHexes));
           setClearedHexes(new Set(def.clearedHexes));
           setEncounterHealth(def.encounterHealth ?? {});
+          setAnchorUses(def.anchorUses ?? {});
           setRiftProgress(def.riftProgress ?? {});
           setCampaignStatus(def.campaignStatus ?? 'active');
           setResources(next.resources);
@@ -174,12 +188,26 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         return next;
       });
       setPlayerPos({ q, r });
+      // Slipstream Surge (Wayfinder): moving to cleared/empty hex, 30% chance to restore 1 HP
+      if (
+        character?.startingMoveId === 'slipstream-surge' &&
+        (clearedHexes.has(id) || !placedEncounters[id]) &&
+        Math.random() < 0.3
+      ) {
+        setCharacterState((prev) => {
+          if (!prev) return null;
+          const maxHp = prev.maxHp ?? 5;
+          const currentHp = prev.hp ?? maxHp;
+          if (currentHp >= maxHp) return prev;
+          return { ...prev, hp: currentHp + 1 };
+        });
+      }
     },
-    [resources, playerPos, notify]
+    [resources, playerPos, notify, character?.startingMoveId, clearedHexes, placedEncounters]
   );
 
   const engageEncounter = useCallback(
-    (hexId: string, encounter: MapEncounter) => {
+    (hexId: string, encounter: MapEncounter, options?: { phaseStrike?: boolean }) => {
       // Anomalies: resolve in one shot (existing cost + clear)
       if (encounter.type === 'anomaly') {
         const costShape = {
@@ -220,16 +248,77 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
       }
 
       // Combat: spend up to min(available Strikes, enemy remaining HP) per turn; then one retaliation if enemy survives
-      if (resources.strikes < 1) {
-        notify('Need 1 Strike to attack. Log more Strength!', 'error');
-        return;
-      }
       if (!character) return;
 
       const enemyStrikes = encounter.strikes ?? 1;
       const currentEnemyHp = encounterHealth[hexId] ?? enemyStrikes;
-      const strikesToUse = Math.min(resources.strikes, currentEnemyHp);
 
+      // Phase Strike (Wayfinder): spend 3 Slipstream, deal 1 damage, no retaliation
+      if (options?.phaseStrike) {
+        if (character.startingMoveId !== 'phase-strike') {
+          notify('Phase Strike is a Wayfinder move.', 'error');
+          return;
+        }
+        if (resources.slipstream < 3) {
+          notify('Need 3 Slipstream for Phase Strike. Log more Cardio!', 'error');
+          return;
+        }
+        const afterSlipstream = spendSlipstream(resources, 3);
+        if (!afterSlipstream) return;
+        setResources(afterSlipstream);
+        const newEnemyHp = currentEnemyHp - 1;
+        setEncounterHealth((prev) => {
+          const next = { ...prev };
+          if (newEnemyHp <= 0) delete next[hexId];
+          else next[hexId] = newEnemyHp;
+          return next;
+        });
+        if (newEnemyHp <= 0) {
+          const fullEncounter = campaign.encounters.find(
+            (e) => e.id === encounter.id || (e.name === encounter.name && e.type === encounter.type)
+          );
+          const xpGain = fullEncounter?.xp ?? (encounter.type === 'basic' ? 1 : encounter.type === 'elite' ? 2 : 4);
+          setClearedHexes((prev) => new Set(prev).add(hexId));
+          setProgression((prev) => {
+            const result = applyEncounterRewardWithLevelUpFlow(prev, encounter.gold, xpGain);
+            if (result.leveledUp && result.nextProgressionAfterLevelUp) {
+              setPendingLevelUp(true);
+              setPendingProgressionAfterLevelUp(result.nextProgressionAfterLevelUp);
+              return result.progression;
+            }
+            return result.progression;
+          });
+          if (encounter.type === 'boss') setCampaignStatus('victory');
+          if (encounter.id && fullEncounter?.loot_drop) {
+            const item = lootDropToInventoryItem(fullEncounter.loot_drop);
+            setInventory((prev) => [...prev, item]);
+            if (item.kind === 'artifact') {
+              setCharacterState((prev) => {
+                if (!prev) return null;
+                const newStats = applyArtifactOnAcquisition(item.id, prev.stats);
+                return newStats ? { ...prev, stats: newStats } : prev;
+              });
+            }
+          }
+          if (character.startingMoveId === 'aura-of-conquest') {
+            setResources((r) => ({ ...r, wards: r.wards + 1 }));
+          }
+          setAnchorUses((prev) => {
+            const next = { ...prev };
+            delete next[hexId];
+            return next;
+          });
+          setJustClearedHexId(hexId);
+        }
+        return;
+      }
+
+      if (resources.strikes < 1) {
+        notify('Need 1 Strike to attack. Log more Strength!', 'error');
+        return;
+      }
+
+      const strikesToUse = Math.min(resources.strikes, currentEnemyHp);
       const nextResources = spendStrikes(resources, strikesToUse);
       if (!nextResources) return;
       setResources(nextResources);
@@ -274,18 +363,35 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
             }
           }
         }
+        if (character.startingMoveId === 'aura-of-conquest') {
+          setResources((r) => ({ ...r, wards: r.wards + 1 }));
+        }
+        setAnchorUses((prev) => {
+          const next = { ...prev };
+          delete next[hexId];
+          return next;
+        });
         setJustClearedHexId(hexId);
         return;
       }
 
-      // Retaliation: enemy survived — Ward absorbs, else lose 1 HP
+      // Retaliation: enemy survived — spend 1 Ward or 1 Aether to absorb, else lose 1 HP
       const hasWard = nextResources.wards > 0;
+      const hasAether = nextResources.aether >= 1;
       if (hasWard) {
         const afterWard = spendWards(nextResources, 1);
         if (afterWard) setResources(afterWard);
+      } else if (hasAether) {
+        const afterAether = spendAether(nextResources, 1);
+        if (afterAether) setResources(afterAether);
       } else {
-        // No ward: lose 1 HP; at 0 HP apply knockback (deduct 50 currency, reset to starting hex, restore HP)
+        // No ward or aether: lose 1 HP; at 0 HP apply knockback (or Defy Reality: sacrifice 1 item, full HP, no knockback)
         const wouldBeZeroHp = character.hp <= 1;
+        if (wouldBeZeroHp && character.startingMoveId === 'defy-reality' && inventory.length > 0) {
+          setInventory((prev) => (prev.length <= 1 ? [] : prev.slice(1)));
+          setCharacterState((prev) => (prev ? { ...prev, hp: prev.maxHp ?? 5 } : null));
+          return;
+        }
         if (wouldBeZeroHp) {
           notify('You hit zero health and are returning to the starting point.', 'info');
         }
@@ -308,6 +414,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
       character,
       encounterHealth,
       clearedHexes,
+      inventory,
       riftProgress,
       campaign.encounters,
       campaign.rifts,
@@ -316,6 +423,143 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
       rows,
       notify,
     ]
+  );
+
+  const useDimensionalAnchor = useCallback(
+    (hexId: string): boolean => {
+      const encounter = placedEncounters[hexId];
+      if (!encounter || (encounter.type !== 'elite' && encounter.type !== 'boss')) {
+        notify('Dimensional Anchor can only be used on Elite or Boss encounters.', 'error');
+        return false;
+      }
+      if (anchorUses[hexId]) {
+        notify('You have already used Dimensional Anchor on this encounter.', 'error');
+        return false;
+      }
+      if (resources.aether < 2) {
+        notify('Need 2 Aether for Dimensional Anchor.', 'error');
+        return false;
+      }
+      if (!character || character.startingMoveId !== 'dimensional-anchor') {
+        notify('Dimensional Anchor is a Rift-Weaver move.', 'error');
+        return false;
+      }
+      const enemyStrikes = encounter.strikes ?? 1;
+      const currentEnemyHp = encounterHealth[hexId] ?? enemyStrikes;
+      if (currentEnemyHp <= 0) return false;
+
+      const afterAether = spendAether(resources, 2);
+      if (!afterAether) return false;
+      setResources(afterAether);
+      setAnchorUses((prev) => ({ ...prev, [hexId]: true }));
+
+      const newEnemyHp = currentEnemyHp - 1;
+      setEncounterHealth((prev) => {
+        const next = { ...prev };
+        if (newEnemyHp <= 0) delete next[hexId];
+        else next[hexId] = newEnemyHp;
+        return next;
+      });
+
+      if (newEnemyHp <= 0) {
+        const fullEncounter = campaign.encounters.find(
+          (e) => e.id === encounter.id || (e.name === encounter.name && e.type === encounter.type)
+        );
+        const xpGain = fullEncounter?.xp ?? (encounter.type === 'elite' ? 2 : 4);
+        setClearedHexes((prev) => new Set(prev).add(hexId));
+        setProgression((prev) => {
+          const result = applyEncounterRewardWithLevelUpFlow(prev, encounter.gold, xpGain);
+          if (result.leveledUp && result.nextProgressionAfterLevelUp) {
+            setPendingLevelUp(true);
+            setPendingProgressionAfterLevelUp(result.nextProgressionAfterLevelUp);
+            return result.progression;
+          }
+          return result.progression;
+        });
+        if (encounter.type === 'boss') setCampaignStatus('victory');
+        if (encounter.id && fullEncounter?.loot_drop) {
+          const item = lootDropToInventoryItem(fullEncounter.loot_drop);
+          setInventory((prev) => [...prev, item]);
+          if (item.kind === 'artifact') {
+            setCharacterState((prev) => {
+              if (!prev) return null;
+              const newStats = applyArtifactOnAcquisition(item.id, prev.stats);
+              return newStats ? { ...prev, stats: newStats } : prev;
+            });
+          }
+        }
+        if (character.startingMoveId === 'aura-of-conquest') {
+          setResources((r) => ({ ...r, wards: r.wards + 1 }));
+        }
+        setAnchorUses((prev) => {
+          const next = { ...prev };
+          delete next[hexId];
+          return next;
+        });
+        setJustClearedHexId(hexId);
+      }
+      return true;
+    },
+    [
+      placedEncounters,
+      anchorUses,
+      resources,
+      character,
+      encounterHealth,
+      campaign.encounters,
+      notify,
+    ]
+  );
+
+  const nexusSynthesizerHeal = useCallback((): boolean => {
+    if (!character || character.startingMoveId !== 'nexus-synthesizer') {
+      notify('Nexus Synthesizer is a Rift-Weaver move.', 'error');
+      return false;
+    }
+    if (resources.aether < 2) {
+      notify('Need 2 Aether for Nexus Synthesizer.', 'error');
+      return false;
+    }
+    const afterAether = spendAether(resources, 2);
+    if (!afterAether) return false;
+    setResources(afterAether);
+    setCharacterState((prev) => {
+      if (!prev) return null;
+      const maxHp = prev.maxHp ?? 5;
+      const currentHp = prev.hp ?? maxHp;
+      const newHp = Math.min(maxHp, currentHp + 3);
+      if (newHp === currentHp) return prev;
+      return { ...prev, hp: newHp };
+    });
+    return true;
+  }, [character, resources, notify]);
+
+  const onScoutHex = useCallback(
+    (hexId: string): boolean => {
+      if (!character || character.startingMoveId !== 'scout-the-multiverse') {
+        notify('Scout the Multiverse is a Wayfinder move.', 'error');
+        return false;
+      }
+      if (resources.aether < 1) {
+        notify('Need 1 Aether to Scout. Log Wellness.', 'error');
+        return false;
+      }
+      if (revealedHexes.has(hexId)) {
+        notify('That hex is already revealed.', 'error');
+        return false;
+      }
+      const nextRingIds = getHexIdsAtDistance(playerPos.q, playerPos.r, 2);
+      if (!nextRingIds.includes(hexId)) {
+        notify('You can only reveal a hex in the next ring (2 steps away).', 'error');
+        return false;
+      }
+      const afterAether = spendAether(resources, 1);
+      if (!afterAether) return false;
+      setResources(afterAether);
+      setRevealedHexes((prev) => new Set(prev).add(hexId));
+      return true;
+    },
+    [character, playerPos, resources, revealedHexes, notify]
   );
 
   const useConsumable = useCallback((item: InventoryItem) => {
@@ -455,11 +699,12 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         riftProgress,
         encounterHealth,
         campaignStatus,
+        anchorUses,
       },
       pendingLevelUp: pendingLevelUp || undefined,
       pendingProgressionAfterLevelUp: pendingProgressionAfterLevelUp ?? undefined,
     });
-  }, [character, resources, progression, inventory, playerPos, revealedHexes, clearedHexes, encounterHealth, riftProgress, campaignStatus, pendingLevelUp, pendingProgressionAfterLevelUp]);
+  }, [character, resources, progression, inventory, playerPos, revealedHexes, clearedHexes, encounterHealth, anchorUses, riftProgress, campaignStatus, pendingLevelUp, pendingProgressionAfterLevelUp]);
 
   return {
     character,
@@ -478,6 +723,11 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
     setClearedHexes,
     encounterHealth,
     setEncounterHealth,
+    anchorUses,
+    setAnchorUses,
+    useDimensionalAnchor,
+    nexusSynthesizerHeal,
+    onScoutHex,
     justClearedHexId,
     setJustClearedHexId,
     riftProgress,

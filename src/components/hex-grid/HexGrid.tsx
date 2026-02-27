@@ -10,6 +10,7 @@ import {
   getRectGridPixelBounds,
   getRectGridTransform,
   hexToViewPixel,
+  hexDistance,
   DEFAULT_HEX_SIZE,
 } from '@/engine/hex-math';
 import { HexTile } from './HexTile';
@@ -31,6 +32,8 @@ interface HexGridProps {
   encounters: Record<string, MapEncounter>;
   /** Remaining hits per encounter hex (combat only). */
   encounterHealth?: Record<string, number>;
+  /** Per-encounter: whether Dimensional Anchor was used (hexId -> true). */
+  anchorUses?: Record<string, boolean>;
   /** Hex id -> rift id for narrative rift entrance hexes. */
   placedRifts: Record<string, string>;
   riftProgress: RiftProgress;
@@ -39,7 +42,9 @@ interface HexGridProps {
   lootFrameUrl: string;
   resources?: CharacterResources;
   onMove: (q: number, r: number, id: string) => void;
-  onEngageEncounter: (hexId: string, encounter: MapEncounter) => void;
+  onEngageEncounter: (hexId: string, encounter: MapEncounter, options?: { phaseStrike?: boolean }) => void;
+  useDimensionalAnchor?: (hexId: string) => boolean;
+  onScoutHex?: (hexId: string) => boolean;
   onAttemptRiftStage: (hexId: string, riftId: string, stageIndex: number) => boolean;
   onContinueFromVictory: () => void;
 }
@@ -54,6 +59,7 @@ export function HexGrid({
   justClearedHexId,
   encounters,
   encounterHealth,
+  anchorUses = {},
   placedRifts,
   riftProgress,
   campaign,
@@ -62,6 +68,8 @@ export function HexGrid({
   resources,
   onMove,
   onEngageEncounter,
+  useDimensionalAnchor,
+  onScoutHex,
   onAttemptRiftStage,
   onContinueFromVictory,
 }: HexGridProps) {
@@ -120,6 +128,14 @@ export function HexGrid({
           {grid.map((hex) => {
             const { x, y } = hexToPixel(hex.q, hex.r, DEFAULT_HEX_SIZE);
             const { x: vx, y: vy } = hexToViewPixel(x, y, bounds, transform);
+            const isScoutable =
+              !!onScoutHex &&
+              !!character?.startingMoveId &&
+              character.startingMoveId === 'scout-the-multiverse' &&
+              !!resources &&
+              resources.aether >= 1 &&
+              !revealedHexes.has(hex.id) &&
+              hexDistance(playerPos, { q: hex.q, r: hex.r }) === 2;
             return (
               <HexTile
                 key={hex.id}
@@ -134,6 +150,8 @@ export function HexGrid({
                 isCleared={clearedHexes.has(hex.id)}
                 isRiftHex={hex.id in placedRifts}
                 onMove={onMove}
+                isScoutable={isScoutable}
+                onScout={isScoutable ? () => onScoutHex(hex.id) : undefined}
               />
             );
           })}
@@ -164,6 +182,30 @@ export function HexGrid({
           resources={resources}
           onEngage={() => onEngageEncounter(playerHexId, currentEncounter)}
           onContinue={onContinueFromVictory}
+          onPhaseStrike={
+            character?.startingMoveId === 'phase-strike' && (currentEncounter.type === 'basic' || currentEncounter.type === 'elite' || currentEncounter.type === 'boss')
+              ? () => onEngageEncounter(playerHexId, currentEncounter, { phaseStrike: true })
+              : undefined
+          }
+          canPhaseStrike={
+            !!resources &&
+            character?.startingMoveId === 'phase-strike' &&
+            resources.slipstream >= 3 &&
+            (currentEncounter.type === 'basic' || currentEncounter.type === 'elite' || currentEncounter.type === 'boss')
+          }
+          onDimensionalAnchor={
+            useDimensionalAnchor && (currentEncounter.type === 'elite' || currentEncounter.type === 'boss')
+              ? () => useDimensionalAnchor(playerHexId)
+              : undefined
+          }
+          canDimensionalAnchor={
+            !!useDimensionalAnchor &&
+            !!resources &&
+            character?.startingMoveId === 'dimensional-anchor' &&
+            (currentEncounter.type === 'elite' || currentEncounter.type === 'boss') &&
+            !anchorUses[playerHexId] &&
+            resources.aether >= 2
+          }
         />
       )}
     </div>

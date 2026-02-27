@@ -233,3 +233,24 @@ export function getNeighborDeltas(): ReadonlyArray<[number, number]> {
 export function getAdjacentHexIds(q: number, r: number): string[] {
   return AXIAL_NEIGHBORS.map(([dq, dr]) => `${q + dq},${r + dr}`);
 }
+
+/**
+ * Get hex ids at exactly the given distance (e.g. 2 = next ring out from adjacent).
+ */
+export function getHexIdsAtDistance(q: number, r: number, distance: number): string[] {
+  if (distance <= 0) return [];
+  if (distance === 1) return getAdjacentHexIds(q, r);
+  const center: AxialCoord = { q, r };
+  const ring = new Set<string>();
+  const neighborsAtD1 = getAdjacentHexIds(q, r);
+  for (const id of neighborsAtD1) {
+    const [nq, nr] = id.split(',').map(Number);
+    for (const id2 of getAdjacentHexIds(nq, nr)) {
+      const [q2, r2] = id2.split(',').map(Number);
+      if (hexDistance(center, { q: q2, r: r2 }) === distance) {
+        ring.add(id2);
+      }
+    }
+  }
+  return Array.from(ring);
+}

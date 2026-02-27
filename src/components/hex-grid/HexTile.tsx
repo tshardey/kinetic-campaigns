@@ -15,6 +15,9 @@ interface HexTileProps {
   /** True when this hex is a narrative rift entrance (show rift marker when revealed). */
   isRiftHex?: boolean;
   onMove: (q: number, r: number, id: string) => void;
+  /** Scout the Multiverse: hex is in next ring (distance 2), not yet revealed; click to reveal. */
+  isScoutable?: boolean;
+  onScout?: () => void;
 }
 
 function getEncounterEmoji(encounter: MapEncounter): string {
@@ -36,12 +39,18 @@ export function HexTile({
   isCleared,
   isRiftHex = false,
   onMove,
+  isScoutable = false,
+  onScout,
 }: HexTileProps) {
   // Unrevealed: opaque fog of war. Revealed: transparent so underlying map shows through.
   let fill = '#1e293b';
   let fillOpacity = 1;
   let stroke = '#0f172a';
-  if (isRevealed) {
+  if (isScoutable) {
+    fill = '#1e3a5f';
+    fillOpacity = 0.85;
+    stroke = 'rgba(56, 189, 248, 0.6)';
+  } else if (isRevealed) {
     fillOpacity = 0.35;
     fill = '#334155';
     stroke = 'rgba(71, 85, 105, 0.9)';
@@ -57,7 +66,8 @@ export function HexTile({
     }
   }
 
-  const canClick = isRevealed && !isPlayerHere;
+  const canMove = isRevealed && !isPlayerHere;
+  const canScout = isScoutable && onScout;
 
   return (
     <g transform={`translate(${pixelX}, ${pixelY}) scale(${scale})`}>
@@ -67,12 +77,25 @@ export function HexTile({
         fillOpacity={fillOpacity}
         stroke={stroke}
         strokeWidth="2"
-        className={`transition-all duration-300 ${canClick ? 'cursor-pointer hover:opacity-80' : ''}`}
-        style={canClick ? { touchAction: 'manipulation' } : undefined}
+        className={`transition-all duration-300 ${canMove || canScout ? 'cursor-pointer hover:opacity-80' : ''}`}
+        style={canMove || canScout ? { touchAction: 'manipulation' } : undefined}
         pointerEvents="none"
       />
       {/* Larger transparent hit area for touch (min ~44px); receives clicks when clickable */}
-      {canClick && (
+      {canScout && (
+        <circle
+          r="24"
+          fill="transparent"
+          className="cursor-pointer"
+          style={{ touchAction: 'manipulation' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onScout?.();
+          }}
+          aria-label={`Scout hex ${hex.id}`}
+        />
+      )}
+      {canMove && !canScout && (
         <circle
           r="24"
           fill="transparent"
@@ -94,7 +117,19 @@ export function HexTile({
           🌙
         </text>
       )}
-      {isRevealed && !isRiftHex && encounter && !isCleared && (
+      {isScoutable && (
+        <text
+          x="0"
+          y="5"
+          textAnchor="middle"
+          fill="rgba(56, 189, 248, 0.9)"
+          fontSize="14"
+          pointerEvents="none"
+        >
+          🔭
+        </text>
+      )}
+      {isRevealed && !isRiftHex && !isScoutable && encounter && !isCleared && (
         <text
           x="0"
           y="5"

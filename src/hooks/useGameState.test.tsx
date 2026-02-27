@@ -9,6 +9,7 @@ import type { Character } from '@/types/character';
 import type { CampaignPackage, MapEncounter } from '@/types/campaign';
 import { omijaCampaign } from '@/data/omija';
 import { getDefaultStartHexId } from '@/engine/encounter-placement';
+import { getHexIdsAtDistance } from '@/engine/hex-math';
 
 const COLS = 14;
 const ROWS = 9;
@@ -336,6 +337,26 @@ describe('useGameState', () => {
       expect(result.current.progression.currency).toBe(120 + 10);
       expect(result.current.resources.strikes).toBe(1);
       expect(result.current.encounterHealth['2,2']).toBeUndefined();
+    });
+
+    it('retaliation can be blocked by spending 1 Aether when no Wards', () => {
+      const noWardsWithAether = {
+        ...validCharacter,
+        hp: 3,
+        resources: { slipstream: 5, strikes: 1, wards: 0, aether: 2 },
+      };
+      const twoStrikeEncounter = { type: 'basic' as const, name: 'Tough', strikes: 2, gold: 10 };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      act(() => result.current.setCharacter(noWardsWithAether));
+      act(() => result.current.setPlayerPos({ q: 0, r: 2 }));
+
+      act(() => result.current.engageEncounter('0,2', twoStrikeEncounter));
+
+      expect(result.current.character!.hp).toBe(3);
+      expect(result.current.resources.aether).toBe(1);
+      expect(result.current.encounterHealth['0,2']).toBe(1);
     });
 
     it('heal spends 1 Aether for 1 HP and returns true', () => {
@@ -675,6 +696,407 @@ describe('useGameState', () => {
       expect(result.current.clearedHexes.has('4,4')).toBe(true);
       expect(result.current.campaignStatus).toBe('victory');
       expect(result.current.progression.currency).toBe(120 + 200);
+    });
+  });
+
+  describe('playbook moves: useDimensionalAnchor', () => {
+    const riftWeaverWithAether: Character = {
+      ...validCharacter,
+      playbook: 'rift-weaver',
+      startingMoveId: 'dimensional-anchor',
+      resources: { slipstream: 5, strikes: 2, wards: 0, aether: 3 },
+    };
+    const eliteEncounter = {
+      type: 'elite' as const,
+      id: 'sovereigns-vanguard',
+      name: "The Sovereign's Vanguard",
+      strikes: 2,
+      gold: 50,
+    };
+
+    it('spends 2 Aether and reduces Elite encounter health by 1', () => {
+      const placedEncounters: Record<string, MapEncounter> = { '2,2': eliteEncounter };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, placedEncounters })
+      );
+      act(() => result.current.setCharacter(riftWeaverWithAether));
+      act(() => result.current.setPlayerPos({ q: 2, r: 2 }));
+
+      expect(result.current.encounterHealth['2,2']).toBeUndefined();
+      expect(result.current.resources.aether).toBe(3);
+
+      let ok = false;
+      act(() => {
+        ok = result.current.useDimensionalAnchor('2,2');
+      });
+
+      expect(ok).toBe(true);
+      expect(result.current.resources.aether).toBe(1);
+      expect(result.current.anchorUses['2,2']).toBe(true);
+      expect(result.current.encounterHealth['2,2']).toBe(1);
+    });
+
+    it('returns false and notifies when not Rift-Weaver with Dimensional Anchor', () => {
+      const toast = vi.fn();
+      const placedEncounters: Record<string, MapEncounter> = { '2,2': eliteEncounter };
+      const gateCrasherWithAether = { ...validCharacter, resources: { ...validCharacter.resources, aether: 3 } };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, placedEncounters, toast })
+      );
+      act(() => result.current.setCharacter(gateCrasherWithAether));
+      act(() => result.current.setPlayerPos({ q: 2, r: 2 }));
+
+      let ok = true;
+      act(() => {
+        ok = result.current.useDimensionalAnchor('2,2');
+      });
+
+      expect(ok).toBe(false);
+      expect(toast).toHaveBeenCalledWith('Dimensional Anchor is a Rift-Weaver move.', 'error');
+      expect(result.current.resources.aether).toBe(3);
+    });
+
+    it('returns false when insufficient Aether', () => {
+      const toast = vi.fn();
+      const lowAether = { ...riftWeaverWithAether, resources: { ...riftWeaverWithAether.resources, aether: 1 } };
+      const placedEncounters: Record<string, MapEncounter> = { '2,2': eliteEncounter };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, placedEncounters, toast })
+      );
+      act(() => result.current.setCharacter(lowAether));
+      act(() => result.current.setPlayerPos({ q: 2, r: 2 }));
+
+      let ok = true;
+      act(() => {
+        ok = result.current.useDimensionalAnchor('2,2');
+      });
+
+      expect(ok).toBe(false);
+      expect(toast).toHaveBeenCalledWith('Need 2 Aether for Dimensional Anchor.', 'error');
+      expect(result.current.resources.aether).toBe(1);
+    });
+
+    it('returns false when used already on this encounter', () => {
+      const toast = vi.fn();
+      const placedEncounters: Record<string, MapEncounter> = { '2,2': eliteEncounter };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, placedEncounters, toast })
+      );
+      act(() => result.current.setCharacter(riftWeaverWithAether));
+      act(() => result.current.setPlayerPos({ q: 2, r: 2 }));
+
+      act(() => {
+        result.current.useDimensionalAnchor('2,2');
+      });
+      expect(result.current.anchorUses['2,2']).toBe(true);
+
+      let ok = true;
+      act(() => {
+        ok = result.current.useDimensionalAnchor('2,2');
+      });
+
+      expect(ok).toBe(false);
+      expect(toast).toHaveBeenCalledWith('You have already used Dimensional Anchor on this encounter.', 'error');
+    });
+  });
+
+  describe('playbook moves: Phase Strike', () => {
+    const wayfinder: Character = {
+      ...validCharacter,
+      playbook: 'wayfinder',
+      startingMoveId: 'phase-strike',
+      resources: { slipstream: 5, strikes: 0, wards: 0, aether: 1 },
+    };
+    const basicEncounter = { type: 'basic' as const, name: 'Scout', strikes: 1, gold: 10 };
+
+    it('spends 3 Slipstream, deals 1 damage, no retaliation, and clears hex when enemy dies', () => {
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      act(() => result.current.setCharacter(wayfinder));
+      act(() => result.current.setPlayerPos({ q: 0, r: 3 }));
+
+      act(() => {
+        result.current.engageEncounter('0,3', basicEncounter, { phaseStrike: true });
+      });
+
+      expect(result.current.resources.slipstream).toBe(2);
+      expect(result.current.resources.strikes).toBe(0);
+      expect(result.current.clearedHexes.has('0,3')).toBe(true);
+      expect(result.current.character!.hp).toBe(5);
+    });
+
+    it('notifies when not Wayfinder with Phase Strike', () => {
+      const toast = vi.fn();
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, toast })
+      );
+      act(() => result.current.setCharacter(validCharacter));
+      act(() => result.current.setPlayerPos({ q: 0, r: 3 }));
+
+      act(() => {
+        result.current.engageEncounter('0,3', basicEncounter, { phaseStrike: true });
+      });
+
+      expect(toast).toHaveBeenCalledWith('Phase Strike is a Wayfinder move.', 'error');
+      expect(result.current.clearedHexes.has('0,3')).toBe(false);
+    });
+
+    it('notifies when insufficient Slipstream', () => {
+      const toast = vi.fn();
+      const lowSlip = { ...wayfinder, resources: { ...wayfinder.resources, slipstream: 2 } };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, toast })
+      );
+      act(() => result.current.setCharacter(lowSlip));
+      act(() => result.current.setPlayerPos({ q: 0, r: 3 }));
+
+      act(() => {
+        result.current.engageEncounter('0,3', basicEncounter, { phaseStrike: true });
+      });
+
+      expect(toast).toHaveBeenCalledWith('Need 3 Slipstream for Phase Strike. Log more Cardio!', 'error');
+      expect(result.current.resources.slipstream).toBe(2);
+    });
+  });
+
+  describe('playbook moves: Aura of Conquest', () => {
+    it('grants +1 Ward on victory when Gate-Crasher with Aura of Conquest', () => {
+      const gateCrasherAura: Character = {
+        ...validCharacter,
+        playbook: 'gate-crasher',
+        startingMoveId: 'aura-of-conquest',
+        resources: { slipstream: 5, strikes: 2, wards: 0, aether: 1 },
+      };
+      const basicEncounter = { type: 'basic' as const, name: 'Scout', strikes: 1, gold: 10 };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      act(() => result.current.setCharacter(gateCrasherAura));
+      act(() => result.current.setPlayerPos({ q: 1, r: 2 }));
+
+      expect(result.current.resources.wards).toBe(0);
+      act(() => result.current.engageEncounter('1,2', basicEncounter));
+      expect(result.current.clearedHexes.has('1,2')).toBe(true);
+      expect(result.current.resources.wards).toBe(1);
+    });
+  });
+
+  describe('playbook moves: Defy Reality', () => {
+    it('sacrifices 1 item, restores full HP, and bypasses knockback when would hit 0 HP', () => {
+      const gateCrasherDefy: Character = {
+        ...validCharacter,
+        playbook: 'gate-crasher',
+        startingMoveId: 'defy-reality',
+        hp: 1,
+        maxHp: 5,
+        resources: { slipstream: 5, strikes: 1, wards: 0, aether: 0 },
+        inventory: [
+          { id: 'test-item', name: 'Test Loot', kind: 'consumable', description: null, image_url: null },
+        ],
+      };
+      const twoStrikeEncounter = { type: 'basic' as const, name: 'Tough', strikes: 2, gold: 10 };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      act(() => result.current.setCharacter(gateCrasherDefy));
+      act(() => result.current.setPlayerPos({ q: 0, r: 2 }));
+      const startPos = { ...result.current.playerPos };
+      const currencyBefore = result.current.progression.currency;
+
+      act(() => result.current.engageEncounter('0,2', twoStrikeEncounter));
+
+      expect(result.current.character!.hp).toBe(5);
+      expect(result.current.inventory).toHaveLength(0);
+      expect(result.current.playerPos).toEqual(startPos);
+      expect(result.current.progression.currency).toBe(currencyBefore);
+    });
+  });
+
+  describe('playbook moves: nexusSynthesizerHeal', () => {
+    const riftWeaverNexus: Character = {
+      ...validCharacter,
+      playbook: 'rift-weaver',
+      startingMoveId: 'nexus-synthesizer',
+      hp: 2,
+      maxHp: 5,
+      resources: { slipstream: 5, strikes: 2, wards: 0, aether: 3 },
+    };
+
+    it('spends 2 Aether and restores 3 HP when Rift-Weaver with Nexus Synthesizer', () => {
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      act(() => result.current.setCharacter(riftWeaverNexus));
+
+      let ok = false;
+      act(() => {
+        ok = result.current.nexusSynthesizerHeal();
+      });
+
+      expect(ok).toBe(true);
+      expect(result.current.character!.hp).toBe(5);
+      expect(result.current.resources.aether).toBe(1);
+    });
+
+    it('returns false when not Rift-Weaver with Nexus Synthesizer', () => {
+      const toast = vi.fn();
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, toast })
+      );
+      act(() => result.current.setCharacter(validCharacter));
+
+      let ok = true;
+      act(() => {
+        ok = result.current.nexusSynthesizerHeal();
+      });
+
+      expect(ok).toBe(false);
+      expect(toast).toHaveBeenCalledWith('Nexus Synthesizer is a Rift-Weaver move.', 'error');
+    });
+
+    it('returns false when insufficient Aether', () => {
+      const toast = vi.fn();
+      const lowAether = { ...riftWeaverNexus, resources: { ...riftWeaverNexus.resources, aether: 1 } };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, toast })
+      );
+      act(() => result.current.setCharacter(lowAether));
+
+      let ok = true;
+      act(() => {
+        ok = result.current.nexusSynthesizerHeal();
+      });
+
+      expect(ok).toBe(false);
+      expect(toast).toHaveBeenCalledWith('Need 2 Aether for Nexus Synthesizer.', 'error');
+    });
+  });
+
+  describe('playbook moves: onScoutHex', () => {
+    const wayfinderScout: Character = {
+      ...validCharacter,
+      playbook: 'wayfinder',
+      startingMoveId: 'scout-the-multiverse',
+      resources: { slipstream: 5, strikes: 2, wards: 0, aether: 2 },
+    };
+
+    it('spends 1 Aether and adds hex to revealedHexes when hex is at distance 2', () => {
+      const defaultMap = getDefaultMapState(COLS, ROWS);
+      const { q, r } = defaultMap.playerPos;
+      const ring2 = getHexIdsAtDistance(q, r, 2);
+      expect(ring2.length).toBeGreaterThan(0);
+      const hexToReveal = ring2[0];
+
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      act(() => result.current.setCharacter(wayfinderScout));
+
+      expect(result.current.revealedHexes.has(hexToReveal)).toBe(false);
+      expect(result.current.resources.aether).toBe(2);
+
+      let ok = false;
+      act(() => {
+        ok = result.current.onScoutHex(hexToReveal);
+      });
+
+      expect(ok).toBe(true);
+      expect(result.current.revealedHexes.has(hexToReveal)).toBe(true);
+      expect(result.current.resources.aether).toBe(1);
+    });
+
+    it('returns false and notifies when not Wayfinder with Scout the Multiverse', () => {
+      const defaultMap = getDefaultMapState(COLS, ROWS);
+      const ring2 = getHexIdsAtDistance(defaultMap.playerPos.q, defaultMap.playerPos.r, 2);
+      const hexId = ring2[0];
+      const toast = vi.fn();
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, toast })
+      );
+      act(() => result.current.setCharacter(validCharacter));
+
+      let ok = true;
+      act(() => {
+        ok = result.current.onScoutHex(hexId);
+      });
+
+      expect(ok).toBe(false);
+      expect(toast).toHaveBeenCalledWith('Scout the Multiverse is a Wayfinder move.', 'error');
+      expect(result.current.revealedHexes.has(hexId)).toBe(false);
+    });
+
+    it('returns false when insufficient Aether', () => {
+      const defaultMap = getDefaultMapState(COLS, ROWS);
+      const ring2 = getHexIdsAtDistance(defaultMap.playerPos.q, defaultMap.playerPos.r, 2);
+      const hexId = ring2[0];
+      const toast = vi.fn();
+      const noAether = { ...wayfinderScout, resources: { ...wayfinderScout.resources, aether: 0 } };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, toast })
+      );
+      act(() => result.current.setCharacter(noAether));
+
+      let ok = true;
+      act(() => {
+        ok = result.current.onScoutHex(hexId);
+      });
+
+      expect(ok).toBe(false);
+      expect(toast).toHaveBeenCalledWith('Need 1 Aether to Scout. Log Wellness.', 'error');
+      expect(result.current.revealedHexes.has(hexId)).toBe(false);
+    });
+
+    it('returns false when hex is not at distance 2', () => {
+      const toast = vi.fn();
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, toast })
+      );
+      act(() => result.current.setCharacter(wayfinderScout));
+      const ring2 = getHexIdsAtDistance(result.current.playerPos.q, result.current.playerPos.r, 2);
+      const farHex = '99,99';
+      expect(ring2).not.toContain(farHex);
+
+      let ok = true;
+      act(() => {
+        ok = result.current.onScoutHex(farHex);
+      });
+
+      expect(ok).toBe(false);
+      expect(toast).toHaveBeenCalledWith('You can only reveal a hex in the next ring (2 steps away).', 'error');
+    });
+
+    it('returns false when hex is already revealed and does not spend Aether', () => {
+      const defaultMap = getDefaultMapState(COLS, ROWS);
+      const ring2 = getHexIdsAtDistance(defaultMap.playerPos.q, defaultMap.playerPos.r, 2);
+      const hexId = ring2[0];
+      const toast = vi.fn();
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, toast })
+      );
+      act(() => result.current.setCharacter(wayfinderScout));
+      act(() => result.current.setRevealedHexes((prev) => new Set(prev).add(hexId)));
+
+      let ok = true;
+      act(() => {
+        ok = result.current.onScoutHex(hexId);
+      });
+
+      expect(ok).toBe(false);
+      expect(toast).toHaveBeenCalledWith('That hex is already revealed.', 'error');
+      expect(result.current.resources.aether).toBe(2);
+    });
+  });
+
+  describe('anchorUses state', () => {
+    it('exposes anchorUses and initializes from load', () => {
+      const mapState = getDefaultMapState(COLS, ROWS);
+      (mapState as { anchorUses?: Record<string, boolean> }).anchorUses = { '3,3': true };
+      saveGameState({ character: validCharacter, mapState });
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      expect(result.current.anchorUses['3,3']).toBe(true);
     });
   });
 });

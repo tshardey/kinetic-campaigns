@@ -36,10 +36,14 @@ function App() {
     justClearedHexId,
     setJustClearedHexId,
     encounterHealth,
+    anchorUses,
     riftProgress,
     logWorkout,
     movePlayer,
     engageEncounter,
+    useDimensionalAnchor,
+    nexusSynthesizerHeal,
+    onScoutHex,
     attemptRiftStage,
     useConsumable,
     heal,
@@ -88,6 +92,7 @@ function App() {
             onLogActivity={logWorkout}
             onUseConsumable={useConsumable}
             onHeal={heal}
+            onNexusSynthesizerHeal={nexusSynthesizerHeal}
             onCloseSidebar={() => setSidebarOpen(false)}
           />
         </div>
@@ -149,6 +154,7 @@ function App() {
               justClearedHexId={justClearedHexId}
               encounters={placedEncounters}
               encounterHealth={encounterHealth}
+              anchorUses={anchorUses}
               placedRifts={placedRifts}
               riftProgress={riftProgress}
               campaign={campaign}
@@ -157,6 +163,8 @@ function App() {
               resources={resources}
               onMove={movePlayer}
               onEngageEncounter={engageEncounter}
+              useDimensionalAnchor={useDimensionalAnchor}
+              onScoutHex={onScoutHex}
               onAttemptRiftStage={attemptRiftStage}
               onContinueFromVictory={() => setJustClearedHexId(null)}
             />

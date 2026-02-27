@@ -25,6 +25,8 @@ export interface MapState {
   encounterHealth?: Record<string, number>;
   /** Campaign win state; set when realm boss is defeated. */
   campaignStatus?: CampaignStatus;
+  /** Per-encounter: whether Dimensional Anchor was already used (hexId -> true). */
+  anchorUses?: Record<string, boolean>;
 }
 
 export interface PersistedGameState {
@@ -48,6 +50,7 @@ export function getDefaultMapState(cols: number, rows: number): MapState {
     riftProgress: {},
     encounterHealth: {},
     campaignStatus: 'active',
+    anchorUses: {},
   };
 }
 
@@ -88,6 +91,7 @@ export function loadGameState(cols: number, rows: number): PersistedGameState | 
             ...data.mapState,
             encounterHealth: data.mapState.encounterHealth ?? {},
             campaignStatus: data.mapState.campaignStatus ?? 'active',
+            anchorUses: data.mapState.anchorUses ?? {},
           };
           return {
             character: ensureCharacterHp(data.character),

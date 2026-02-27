@@ -50,6 +50,12 @@ interface EncounterPanelProps {
   remainingHits?: number;
   onEngage: () => void;
   onContinue: () => void;
+  /** Phase Strike (Wayfinder): attack with 3 Slipstream, no retaliation. */
+  onPhaseStrike?: () => void;
+  canPhaseStrike?: boolean;
+  /** Dimensional Anchor (Rift-Weaver): spend 2 Aether, reduce Elite/Boss strikes by 1 (once per encounter). */
+  onDimensionalAnchor?: () => void;
+  canDimensionalAnchor?: boolean;
 }
 
 export function EncounterPanel({
@@ -61,6 +67,10 @@ export function EncounterPanel({
   remainingHits,
   onEngage,
   onContinue,
+  onPhaseStrike,
+  canPhaseStrike,
+  onDimensionalAnchor,
+  canDimensionalAnchor,
 }: EncounterPanelProps) {
   const full = getFullEncounter(encounter, campaign);
   const isCombat = full && 'strikes' in full;
@@ -228,14 +238,34 @@ export function EncounterPanel({
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={onEngage}
-          disabled={resources !== undefined && !canAfford}
-          className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-500 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg shadow-indigo-500/20"
-        >
-          {isAnomaly ? 'Resolve Anomaly' : 'Engage Encounter'}
-        </button>
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={onEngage}
+            disabled={resources !== undefined && !canAfford}
+            className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-indigo-500 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-lg shadow-indigo-500/20"
+          >
+            {isAnomaly ? 'Resolve Anomaly' : 'Engage Encounter'}
+          </button>
+          {!isAnomaly && canPhaseStrike && onPhaseStrike && (
+            <button
+              type="button"
+              onClick={onPhaseStrike}
+              className="w-full bg-violet-600 hover:bg-violet-500 text-white font-medium py-2 px-4 rounded-xl transition-colors text-sm border border-violet-500/50"
+            >
+              Phase Strike (3 Slipstream — no retaliation)
+            </button>
+          )}
+          {!isAnomaly && canDimensionalAnchor && onDimensionalAnchor && (
+            <button
+              type="button"
+              onClick={onDimensionalAnchor}
+              className="w-full bg-sky-700 hover:bg-sky-600 text-white font-medium py-2 px-4 rounded-xl transition-colors text-sm border border-sky-500/50"
+            >
+              Dimensional Anchor (2 Aether — −1 strike this encounter)
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

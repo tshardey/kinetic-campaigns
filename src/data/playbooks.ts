@@ -21,19 +21,19 @@ export const PLAYBOOKS: PlaybookDefinition[] = [
         id: 'aether-shield',
         name: 'Aether Shield',
         description:
-          '20 mins of Yoga grants 1 Ward. Spend a Ward to absorb a local entity\'s attack completely.',
+          'When an enemy retaliates, you may spend 1 Ward or 1 Aether to absorb the hit completely.',
       },
       {
         id: 'nexus-synthesizer',
         name: 'Nexus Synthesizer',
         description:
-          'Log a healthy home-cooked meal to convert local drops into a Restorative Consumable (Refills Aether or grants +1 Haste for next cardio session).',
+          'Spend 2 Aether to restore 3 HP.',
       },
       {
         id: 'dimensional-anchor',
         name: 'Dimensional Anchor',
         description:
-          'Spend 1 Focus (earned via meditation) to lock down an Elite/Boss, reducing its required Strikes by 1.',
+          'Spend 2 Aether (once per encounter) to reduce an Elite or Boss\'s required Strikes by 1.',
       },
     ],
   },
@@ -54,13 +54,13 @@ export const PLAYBOOKS: PlaybookDefinition[] = [
         id: 'aura-of-conquest',
         name: 'Aura of Conquest',
         description:
-          'Logging an in-person, professional class forces all adjacent basic mobs to flee, leaving their loot behind.',
+          'When you defeat an encounter, gain +1 Ward.',
       },
       {
         id: 'defy-reality',
         name: 'Defy Reality',
         description:
-          'If your HP reaches zero, permanently sacrifice 1 piece of Loot to stay at 1 HP and immediately strike back.',
+          'If your HP would reach zero, sacrifice 1 piece of Loot to restore to full HP and avoid Knockback.',
       },
     ],
   },
@@ -75,19 +75,19 @@ export const PLAYBOOKS: PlaybookDefinition[] = [
         id: 'scout-the-multiverse',
         name: 'Scout the Multiverse',
         description:
-          'Taking a pet on a dedicated walk generates a Scout Token, allowing you to reveal an adjacent hex without moving into it.',
+          'Spend 1 Aether to reveal a hex in the next ring (2 steps away) without moving.',
       },
       {
         id: 'slipstream-surge',
         name: 'Slipstream Surge',
         description:
-          'When biking, activate this to leap 2 hexes in a straight line, ignoring basic encounter tiles in your path.',
+          'When you move onto a cleared or empty hex, you have a 30% chance to restore 1 HP.',
       },
       {
         id: 'phase-strike',
         name: 'Phase Strike',
         description:
-          'Spend 2 Slipstream Tokens (Cardio) to deal 1 Strike to an obstacle through interdimensional evasion, bypassing the need for a Strength workout.',
+          'Spend 3 Slipstream to deal 1 Strike to an enemy without triggering retaliation.',
       },
     ],
   },

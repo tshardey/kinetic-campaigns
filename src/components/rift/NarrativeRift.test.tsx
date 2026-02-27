@@ -21,7 +21,7 @@ const defaultCharacter: Character = {
   startingMoveId: 'momentum-strike',
   stats: { brawn: 2, flow: 0, haste: 1, focus: -1 },
   resources: defaultResources,
-  progression: { xp: 0, level: 1, currency: 120 },
+  progression: { xp: 0, level: 1, currency: 0 },
   hp: 5,
   maxHp: 5,
 };

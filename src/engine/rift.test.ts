@@ -176,7 +176,7 @@ describe('getRiftStageCostLabel', () => {
       description: '',
     };
     expect(getRiftStageCostLabel(stage)).toBe(
-      '1 Strike (log Strength) + 1 Slipstream (log Cardio) + 1 Ward (log Yoga)'
+      '1 Strike (log Strength) + 1 Slipstream (log Cardio) + 1 Ward (log Agility)'
     );
   });
 
@@ -196,7 +196,7 @@ describe('getRiftStageCostLabel', () => {
         cost: { resource: 'wards', amount: 1 },
         description: '',
       })
-    ).toBe('1 Ward (log Yoga)');
+    ).toBe('1 Ward (log Agility)');
   });
 
   it('returns stat label for legacy required_stat', () => {

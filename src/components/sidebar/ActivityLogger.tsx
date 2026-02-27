@@ -16,6 +16,7 @@ const ACTIVITIES: Array<{
   bgClass: string;
   borderClass: string;
   textClass: string;
+  examples: string;
 }> = [
   {
     type: 'cardio',
@@ -26,6 +27,7 @@ const ACTIVITIES: Array<{
     bgClass: 'bg-teal-500/10 hover:bg-teal-500/20',
     borderClass: 'border-teal-500/20',
     textClass: 'text-teal-300',
+    examples: 'e.g. running, biking, swimming, boxing',
   },
   {
     type: 'strength',
@@ -36,16 +38,18 @@ const ACTIVITIES: Array<{
     bgClass: 'bg-orange-500/10 hover:bg-orange-500/20',
     borderClass: 'border-orange-500/20',
     textClass: 'text-orange-300',
+    examples: 'e.g. lifting, barre, pilates, calisthenics',
   },
   {
     type: 'yoga',
-    label: 'Yoga',
+    label: 'Agility',
     icon: Shield,
     unitLabel: 'Ward',
     minutesPerUnit: 20,
     bgClass: 'bg-blue-500/10 hover:bg-blue-500/20',
     borderClass: 'border-blue-500/20',
     textClass: 'text-blue-300',
+    examples: 'e.g. yoga, martial arts, dancing',
   },
   {
     type: 'wellness',
@@ -56,6 +60,7 @@ const ACTIVITIES: Array<{
     bgClass: 'bg-purple-500/10 hover:bg-purple-500/20',
     borderClass: 'border-purple-500/20',
     textClass: 'text-purple-300',
+    examples: 'e.g. healthy home cooked meal, meditation, massage, relaxing bath',
   },
 ];
 
@@ -76,13 +81,14 @@ export function ActivityLogger({ onLogActivity }: ActivityLoggerProps) {
         Enter minutes; rewards scale by duration (e.g. 20 min cardio = 1 Slipstream).
       </p>
       <div className="space-y-2">
-        {ACTIVITIES.map(({ type, label, icon: Icon, unitLabel, minutesPerUnit, bgClass, borderClass, textClass }) => (
+        {ACTIVITIES.map(({ type, label, icon: Icon, unitLabel, minutesPerUnit, bgClass, borderClass, textClass, examples }) => (
           <div
             key={type}
             className={`flex flex-col gap-1.5 p-3 rounded-lg border ${bgClass} ${borderClass}`}
+            title={examples}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className={`flex items-center text-sm font-medium ${textClass}`}>
+              <span className={`flex items-center text-sm font-medium ${textClass} cursor-help`}>
                 <Icon className="w-4 h-4 mr-2 shrink-0" />
                 {label}
               </span>

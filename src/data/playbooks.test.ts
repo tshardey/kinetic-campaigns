@@ -67,8 +67,8 @@ describe('buildCharacter', () => {
     expect(c.playbook).toBe('gate-crasher');
     expect(c.startingMoveId).toBe('momentum-strike');
     expect(c.stats).toEqual({ brawn: 2, flow: 0, haste: 1, focus: -1 });
-    expect(c.resources).toEqual({ slipstream: 5, strikes: 2, wards: 0, aether: 1 });
-    expect(c.progression).toEqual({ xp: 0, level: 1, currency: 120 });
+    expect(c.resources).toEqual({ slipstream: 1, strikes: 2, wards: 0, aether: 0 });
+    expect(c.progression).toEqual({ xp: 0, level: 1, currency: 0 });
   });
 
   it('trims name and uses Worldhopper when empty', () => {

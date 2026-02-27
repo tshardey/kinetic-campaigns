@@ -18,7 +18,7 @@ import { canAffordRiftStage, spendForRiftStage } from '@/engine/rift';
 import { loadGameState, saveGameState, getDefaultMapState } from '@/lib/game-state-storage';
 
 const DEFAULT_RESOURCES: CharacterResources = { slipstream: 5, strikes: 2, wards: 0, aether: 1 };
-const DEFAULT_PROGRESSION: Progression = { xp: 0, level: 1, currency: 120 };
+const DEFAULT_PROGRESSION: Progression = { xp: 0, level: 1, currency: 0 };
 
 export interface GameStateHookParams {
   cols: number;

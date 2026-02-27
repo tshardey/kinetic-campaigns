@@ -260,7 +260,7 @@ export function CharacterPanel({
           </div>
           <div className="text-right">
             <span className="text-xs text-amber-400 font-bold flex items-center">
-              <Sparkles className="w-3 h-3 mr-1" /> {progression.currency} Currency
+              <Sparkles className="w-3 h-3 mr-1" /> {progression.currency} Credits
             </span>
           </div>
         </div>

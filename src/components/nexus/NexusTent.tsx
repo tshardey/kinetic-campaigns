@@ -16,7 +16,7 @@ export function NexusTent({ currency, rewards, onPurchase }: NexusTentProps) {
           <div>
             <h2 className="text-3xl font-bold text-white mb-2">The Nexus Tent</h2>
             <p className="text-slate-400">
-              Trade your dimensional currency for real-world rewards.
+              Trade your Credits for real-world rewards.
             </p>
           </div>
           <div className="bg-slate-800/80 px-6 py-4 rounded-2xl border border-slate-700 flex items-center">

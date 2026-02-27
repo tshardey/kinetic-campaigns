@@ -12,7 +12,7 @@ export interface ApplyActivityOptions {
   startingMoveId?: string;
 }
 
-/** Stat mapped to each activity for the boost roll: Strength->Brawn, Cardio->Haste, Yoga->Flow, Wellness->Focus. */
+/** Stat mapped to each activity for the boost roll: Strength->Brawn, Cardio->Haste, Agility->Flow, Wellness->Focus. */
 const ACTIVITY_STAT: Record<ActivityType, keyof CharacterStats> = {
   strength: 'brawn',
   cardio: 'haste',
@@ -38,7 +38,7 @@ export interface EncounterCost {
   resource_amount?: number;
 }
 
-/** Minutes per 1 unit: 20 min cardio = 1 Slipstream, 15 min strength = 1 Strike, 20 min yoga = 1 Ward, 15 min wellness = 1 Aether. */
+/** Minutes per 1 unit: 20 min cardio = 1 Slipstream, 15 min strength = 1 Strike, 20 min agility = 1 Ward, 15 min wellness = 1 Aether. */
 export const ACTIVITY_MINUTES_PER_UNIT: Record<ActivityType, number> = {
   cardio: 20,
   strength: 15,
@@ -50,8 +50,8 @@ export const ACTIVITY_MINUTES_PER_UNIT: Record<ActivityType, number> = {
  * Apply a logged activity and return updated resources.
  * When durationMinutes is provided, grants units by floor(durationMinutes / threshold) (e.g. 20 min cardio = 1 Slipstream).
  * When omitted, grants 1 unit (quick log). Under threshold grants 0.
- * When options.stats is provided, adds a boost roll (stat * 0.10 > random) per unit for the mapped stat (Strength->Brawn, Cardio->Haste, Yoga->Flow, Wellness->Focus).
- * Playbook intercepts: Momentum Strike (strength) +1 Strike; Aether Cascade (yoga) 50% +1 Aether.
+ * When options.stats is provided, adds a boost roll (stat * 0.10 > random) per unit for the mapped stat (Strength->Brawn, Cardio->Haste, Agility->Flow, Wellness->Focus).
+ * Playbook intercepts: Momentum Strike (strength) +1 Strike; Aether Cascade (agility) 50% +1 Aether.
  */
 export function applyActivity(
   current: CharacterResources,

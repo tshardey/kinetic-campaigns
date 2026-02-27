@@ -66,7 +66,7 @@ export function spendForRiftStage(
 const RESOURCE_LABELS: Record<AnomalyResourceType, (amount: number) => string> = {
   strikes: (n) => `Strike${n !== 1 ? 's' : ''} (log Strength)`,
   slipstream: () => `Slipstream (log Cardio)`,
-  wards: (n) => `Ward${n !== 1 ? 's' : ''} (log Yoga)`,
+  wards: (n) => `Ward${n !== 1 ? 's' : ''} (log Agility)`,
 };
 
 /**

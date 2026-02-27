@@ -20,7 +20,7 @@ const validCharacter: Character = {
   startingMoveId: 'momentum-strike',
   stats: { brawn: 2, flow: 0, haste: 1, focus: -1 },
   resources: { slipstream: 5, strikes: 2, wards: 0, aether: 1 },
-  progression: { xp: 0, level: 1, currency: 120 },
+  progression: { xp: 0, level: 1, currency: 0 },
   hp: 5,
   maxHp: 5,
 };
@@ -71,7 +71,7 @@ describe('useGameState', () => {
     expect(result.current.character).toBeNull();
     expect(result.current.resources.slipstream).toBe(5);
     expect(result.current.resources.strikes).toBe(2);
-    expect(result.current.progression.currency).toBe(120);
+    expect(result.current.progression.currency).toBe(0);
     expect(result.current.inventory).toEqual([]);
   });
 
@@ -257,7 +257,7 @@ describe('useGameState', () => {
 
       expect(result.current.resources.aether).toBe(1);
       expect(result.current.resources.wards).toBe(0);
-      expect(result.current.progression.currency).toBe(120 + 30);
+      expect(result.current.progression.currency).toBe(0 + 30);
       expect(result.current.clearedHexes.has(hexId)).toBe(true);
       expect(result.current.justClearedHexId).toBe(hexId);
     });
@@ -336,7 +336,7 @@ describe('useGameState', () => {
       act(() => result.current.setCharacter(validCharacter));
       act(() => result.current.engageEncounter('2,2', basicEncounter));
       expect(result.current.clearedHexes.has('2,2')).toBe(true);
-      expect(result.current.progression.currency).toBe(120 + 10);
+      expect(result.current.progression.currency).toBe(0 + 10);
       expect(result.current.resources.strikes).toBe(1);
       expect(result.current.encounterHealth['2,2']).toBeUndefined();
     });
@@ -472,7 +472,7 @@ describe('useGameState', () => {
       };
       const characterAtCap = {
         ...validCharacter,
-        progression: { xp: 9, level: 1, currency: 120 },
+        progression: { xp: 9, level: 1, currency: 0 },
         resources: { slipstream: 5, strikes: 3, wards: 0, aether: 1 },
       };
       const { result } = renderHook(() =>
@@ -500,7 +500,7 @@ describe('useGameState', () => {
       expect(result.current.pendingProgressionAfterLevelUp).not.toBeNull();
       expect(result.current.pendingProgressionAfterLevelUp!.level).toBe(2);
       expect(result.current.pendingProgressionAfterLevelUp!.xp).toBe(1); // 9 + 2 (elite XP) = 11, cap 10 → overflow 1
-      expect(result.current.pendingProgressionAfterLevelUp!.currency).toBe(170);
+      expect(result.current.pendingProgressionAfterLevelUp!.currency).toBe(50);
     });
 
     it('completeLevelUp applies stat choice and clears pending', () => {
@@ -513,7 +513,7 @@ describe('useGameState', () => {
       };
       const characterAtCap = {
         ...validCharacter,
-        progression: { xp: 9, level: 1, currency: 120 },
+        progression: { xp: 9, level: 1, currency: 0 },
         resources: { slipstream: 5, strikes: 3, wards: 0, aether: 1 },
       };
       const { result } = renderHook(() =>
@@ -549,14 +549,14 @@ describe('useGameState', () => {
     it('completeLevelUp with new_move adds move to learnedMoveIds', () => {
       const characterAtCap = {
         ...validCharacter,
-        progression: { xp: 9, level: 1, currency: 120 },
+        progression: { xp: 9, level: 1, currency: 0 },
         resources: { slipstream: 5, strikes: 3, wards: 0, aether: 1 },
       };
       saveGameState({
         character: characterAtCap,
         mapState: getDefaultMapState(COLS, ROWS),
         pendingLevelUp: true,
-        pendingProgressionAfterLevelUp: { xp: 0, level: 2, currency: 120 },
+        pendingProgressionAfterLevelUp: { xp: 0, level: 2, currency: 50 },
       });
 
       const { result } = renderHook(() =>
@@ -578,14 +578,14 @@ describe('useGameState', () => {
         ...validCharacter,
         hp: 2,
         maxHp: 5,
-        progression: { xp: 10, level: 1, currency: 120 },
+        progression: { xp: 10, level: 1, currency: 0 },
         resources: { slipstream: 5, strikes: 3, wards: 0, aether: 1 },
       };
       saveGameState({
         character: woundedAtCap,
         mapState: getDefaultMapState(COLS, ROWS),
         pendingLevelUp: true,
-        pendingProgressionAfterLevelUp: { xp: 0, level: 2, currency: 120 },
+        pendingProgressionAfterLevelUp: { xp: 0, level: 2, currency: 50 },
       });
       const { result } = renderHook(() =>
         useGameState({ cols: COLS, rows: ROWS, campaign })
@@ -697,7 +697,7 @@ describe('useGameState', () => {
 
       expect(result.current.clearedHexes.has('4,4')).toBe(true);
       expect(result.current.campaignStatus).toBe('victory');
-      expect(result.current.progression.currency).toBe(120 + 200);
+      expect(result.current.progression.currency).toBe(0 + 200);
     });
   });
 

@@ -60,7 +60,7 @@ export interface DimensionalAnomaly {
   lore_text?: string;
 }
 
-/** Resource cost for a rift stage (earned by logging activities: Strength→Strikes, Cardio→Slipstream, Yoga→Wards). */
+/** Resource cost for a rift stage (earned by logging activities: Strength→Strikes, Cardio→Slipstream, Agility→Wards). */
 export interface RiftStageCost {
   resource: AnomalyResourceType;
   amount: number;

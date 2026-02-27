@@ -15,7 +15,7 @@ export function RewardCard({ reward, currency, onPurchase }: RewardCardProps) {
     if (canAfford) {
       onPurchase(reward);
     } else {
-      toast('Not enough Currency!', 'error');
+      toast('Not enough Credits!', 'error');
     }
   };
 
@@ -34,7 +34,7 @@ export function RewardCard({ reward, currency, onPurchase }: RewardCardProps) {
             : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
         }`}
       >
-        {reward.cost} Currency
+        {reward.cost} Credits
       </button>
     </div>
   );

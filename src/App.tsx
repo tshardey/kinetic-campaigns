@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Map as MapIcon, Tent, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { Map as MapIcon, Tent, PanelLeftClose, PanelLeft, HelpCircle, X } from 'lucide-react';
 import type { NexusReward } from '@/types/campaign';
 import { loadCharacter } from '@/lib/character-storage';
 import { CharacterPanel } from '@/components/sidebar/CharacterPanel';
@@ -55,6 +55,7 @@ function App() {
 
   const [activeTab, setActiveTab] = useState<'map' | 'nexus'>('map');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
 
   // On viewport >= md, show sidebar by default; on small screens start collapsed
   useEffect(() => {
@@ -140,7 +141,47 @@ function App() {
               <Tent className="w-4 h-4 mr-2" /> The Nexus Tent
             </button>
           </nav>
+          <button
+            type="button"
+            onClick={() => setShowHowToPlay(true)}
+            className="ml-auto p-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-800"
+            aria-label="How to play"
+          >
+            <HelpCircle className="w-5 h-5" />
+          </button>
         </header>
+
+        {showHowToPlay && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-xl max-w-md w-full max-h-[85vh] overflow-y-auto p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-white">How to Play</h2>
+                <button
+                  type="button"
+                  onClick={() => setShowHowToPlay(false)}
+                  className="p-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-800"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="text-sm text-slate-300 space-y-3">
+                <p>
+                  <strong>Realm Map:</strong> Move between hexes to reveal the map. Enter encounters to fight—use Strikes to attack. Clear encounters to earn XP, Credits, and loot.
+                </p>
+                <p>
+                  <strong>Dimensional resources:</strong> Log real-world activities (Cardio, Strength, Agility, Wellness) in the sidebar to earn Slipstream, Strikes, Wards, and Aether. These are spent to use moves and overcome obstacles.
+                </p>
+                <p>
+                  <strong>Level up:</strong> Gain XP from encounters; at the XP cap you level up and choose a new move or stat boost.
+                </p>
+                <p>
+                  <strong>The Nexus Tent:</strong> Spend Credits on real-world rewards you add to the tent. Use them as motivation for your wellness and fitness goals.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex-1 mt-14 md:mt-16 relative min-h-0 touch-manipulation">
           {activeTab === 'map' && (

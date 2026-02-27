@@ -191,7 +191,7 @@ export function EncounterPanel({
               {resources !== undefined && !canAfford && (
                 <p className="text-amber-400/90 text-xs">
                   {resources[encounter.resource] < encounter.resource_amount
-                    ? `Need ${encounter.resource_amount - resources[encounter.resource]} more ${resourceLabel} (log ${encounter.resource === 'strikes' ? 'Strength' : encounter.resource === 'wards' ? 'Yoga' : 'Cardio'}).`
+                    ? `Need ${encounter.resource_amount - resources[encounter.resource]} more ${resourceLabel} (log ${encounter.resource === 'strikes' ? 'Strength' : encounter.resource === 'wards' ? 'Agility' : 'Cardio'}).`
                     : resources.aether < encounter.cost
                       ? `Need ${encounter.cost - resources.aether} more Aether (log Wellness).`
                       : null}

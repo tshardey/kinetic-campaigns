@@ -27,6 +27,11 @@ export function calculateBoost(statValue: number): number {
   return (statValue * 0.1) > Math.random() ? 1 : 0;
 }
 
+/** Round to nearest half (0.5) to keep resource values as whole or half only. */
+function roundToHalf(n: number): number {
+  return Math.round(n * 2) / 2;
+}
+
 /** Encounter cost shape used for affordability and spending. */
 export interface EncounterCost {
   type: 'basic' | 'elite' | 'boss' | 'anomaly';
@@ -38,19 +43,23 @@ export interface EncounterCost {
   resource_amount?: number;
 }
 
-/** Minutes per 1 unit: 20 min cardio = 1 Slipstream, 15 min strength = 1 Strike, 20 min agility = 1 Ward, 15 min wellness = 1 Aether. */
-export const ACTIVITY_MINUTES_PER_UNIT: Record<ActivityType, number> = {
-  cardio: 20,
-  strength: 15,
-  yoga: 20,
-  wellness: 15,
-};
+/** All activities use the same baseline: 20 minutes = 1 point. Points can be half-increments (0.5, 1, 1.5, 2, ...). */
+export const ACTIVITY_MINUTES_PER_POINT = 20;
+
+/**
+ * Activity points from duration: 20 min = 1 point. Rounds down to the nearest half or whole (no finer fractions).
+ * e.g. 10 min → 0.5, 20 min → 1, 30 min → 1.5, 40 min → 2.
+ */
+export function activityPointsFromMinutes(minutes: number): number {
+  if (minutes <= 0) return 0;
+  return Math.floor((minutes / ACTIVITY_MINUTES_PER_POINT) * 2) / 2;
+}
 
 /**
  * Apply a logged activity and return updated resources.
- * When durationMinutes is provided, grants units by floor(durationMinutes / threshold) (e.g. 20 min cardio = 1 Slipstream).
- * When omitted, grants 1 unit (quick log). Under threshold grants 0.
- * When options.stats is provided, adds a boost roll (stat * 0.10 > random) per unit for the mapped stat (Strength->Brawn, Cardio->Haste, Agility->Flow, Wellness->Focus).
+ * All activities use 20 min = 1 point; points round down to nearest half (0.5, 1, 1.5, 2, ...).
+ * When durationMinutes is provided, grants that many points. When omitted, grants 1 point (quick log). Under 10 min grants 0.
+ * When options.stats is provided, adds a boost roll (stat * 0.10 > random) per full point for the mapped stat.
  * Playbook intercepts: Momentum Strike (strength) +1 Strike; Aether Cascade (agility) 50% +1 Aether.
  */
 export function applyActivity(
@@ -60,33 +69,35 @@ export function applyActivity(
   options?: ApplyActivityOptions
 ): CharacterResources {
   const next = { ...current };
-  const units =
+  const points =
     durationMinutes != null && durationMinutes > 0
-      ? Math.floor(durationMinutes / ACTIVITY_MINUTES_PER_UNIT[activity])
+      ? activityPointsFromMinutes(durationMinutes)
       : 1;
-  if (units < 1) return next;
+  if (points < 0.5) return next;
 
   const statKey = options?.stats ? ACTIVITY_STAT[activity] : null;
   const statValue = statKey != null ? options!.stats[statKey] ?? 0 : 0;
   let boostTotal = 0;
-  if (options?.stats && statKey != null) {
-    for (let i = 0; i < units; i++) {
+  const fullPoints = Math.floor(points);
+  if (options?.stats && statKey != null && fullPoints > 0) {
+    for (let i = 0; i < fullPoints; i++) {
       boostTotal += calculateBoost(statValue);
     }
   }
 
+  const total = points + boostTotal;
   switch (activity) {
     case 'cardio':
-      next.slipstream += units + boostTotal;
+      next.slipstream = roundToHalf(next.slipstream + total);
       break;
     case 'strength':
-      next.strikes += units + boostTotal;
+      next.strikes = roundToHalf(next.strikes + total);
       break;
     case 'yoga':
-      next.wards += units + boostTotal;
+      next.wards = roundToHalf(next.wards + total);
       break;
     case 'wellness':
-      next.aether += units + boostTotal;
+      next.aether = roundToHalf(next.aether + total);
       break;
   }
 

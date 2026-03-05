@@ -361,6 +361,48 @@ describe('useGameState', () => {
       expect(result.current.encounterHealth['0,2']).toBe(1);
     });
 
+    it('retaliation with fractional Wards falls back to spending 1 Aether', () => {
+      const fractionalWardsWithAether = {
+        ...validCharacter,
+        hp: 3,
+        resources: { slipstream: 5, strikes: 1, wards: 0.5, aether: 2 },
+      };
+      const twoStrikeEncounter = { type: 'basic' as const, name: 'Tough', strikes: 2, gold: 10 };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      act(() => result.current.setCharacter(fractionalWardsWithAether));
+      act(() => result.current.setPlayerPos({ q: 0, r: 2 }));
+
+      act(() => result.current.engageEncounter('0,2', twoStrikeEncounter));
+
+      expect(result.current.character!.hp).toBe(3);
+      expect(result.current.resources.wards).toBe(0.5);
+      expect(result.current.resources.aether).toBe(1);
+      expect(result.current.encounterHealth['0,2']).toBe(1);
+    });
+
+    it('retaliation with only fractional Wards applies 1 HP loss', () => {
+      const fractionalWardsNoAether = {
+        ...validCharacter,
+        hp: 3,
+        resources: { slipstream: 5, strikes: 1, wards: 0.5, aether: 0 },
+      };
+      const twoStrikeEncounter = { type: 'basic' as const, name: 'Tough', strikes: 2, gold: 10 };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      act(() => result.current.setCharacter(fractionalWardsNoAether));
+      act(() => result.current.setPlayerPos({ q: 0, r: 2 }));
+
+      act(() => result.current.engageEncounter('0,2', twoStrikeEncounter));
+
+      expect(result.current.character!.hp).toBe(2);
+      expect(result.current.resources.wards).toBe(0.5);
+      expect(result.current.resources.aether).toBe(0);
+      expect(result.current.encounterHealth['0,2']).toBe(1);
+    });
+
     it('heal spends 1 Aether for 1 HP and returns true', () => {
       const wounded = { ...validCharacter, hp: 3, maxHp: 5, resources: { ...validCharacter.resources, aether: 2 } };
       const { result } = renderHook(() =>

@@ -6,7 +6,8 @@ import {
   spendWards,
   applyActivity,
   calculateBoost,
-  ACTIVITY_MINUTES_PER_UNIT,
+  activityPointsFromMinutes,
+  ACTIVITY_MINUTES_PER_POINT,
   canAffordMove,
   spendSlipstream,
   spendStrikes,
@@ -155,12 +156,18 @@ describe('spendForEncounter', () => {
   });
 });
 
-describe('ACTIVITY_MINUTES_PER_UNIT', () => {
-  it('defines thresholds for each activity type', () => {
-    expect(ACTIVITY_MINUTES_PER_UNIT.cardio).toBe(20);
-    expect(ACTIVITY_MINUTES_PER_UNIT.strength).toBe(15);
-    expect(ACTIVITY_MINUTES_PER_UNIT.yoga).toBe(20);
-    expect(ACTIVITY_MINUTES_PER_UNIT.wellness).toBe(15);
+describe('activityPointsFromMinutes / ACTIVITY_MINUTES_PER_POINT', () => {
+  it('uses 20 minutes per point for all activities', () => {
+    expect(ACTIVITY_MINUTES_PER_POINT).toBe(20);
+  });
+  it('rounds down to nearest half or whole', () => {
+    expect(activityPointsFromMinutes(5)).toBe(0);
+    expect(activityPointsFromMinutes(10)).toBe(0.5);
+    expect(activityPointsFromMinutes(15)).toBe(0.5);
+    expect(activityPointsFromMinutes(20)).toBe(1);
+    expect(activityPointsFromMinutes(30)).toBe(1.5);
+    expect(activityPointsFromMinutes(40)).toBe(2);
+    expect(activityPointsFromMinutes(39)).toBe(1.5);
   });
 });
 
@@ -175,44 +182,56 @@ describe('applyActivity', () => {
       baseResources.aether + 1
     );
   });
-  it('grants units by duration when durationMinutes provided', () => {
+  it('grants points by duration (20 min = 1, round down to nearest half)', () => {
     // 40 min cardio = 2 slipstream
     expect(applyActivity(baseResources, 'cardio', 40).slipstream).toBe(
       baseResources.slipstream + 2
     );
-    // 30 min strength = 2 strikes (15 min per unit)
+    // 30 min strength = 1.5 strikes (was 2 under old 15 min/unit)
     expect(applyActivity(baseResources, 'strength', 30).strikes).toBe(
-      baseResources.strikes + 2
+      baseResources.strikes + 1.5
+    );
+    // 30 min cardio = 1.5 slipstream (was 1 under old 20 min/unit)
+    expect(applyActivity(baseResources, 'cardio', 30).slipstream).toBe(
+      baseResources.slipstream + 1.5
     );
     // 20 min yoga = 1 ward
     expect(applyActivity(baseResources, 'yoga', 20).wards).toBe(
       baseResources.wards + 1
     );
   });
-  it('grants 0 units when duration below threshold', () => {
-    expect(applyActivity(baseResources, 'cardio', 10).slipstream).toBe(
+  it('grants 0 points when duration under 10 min', () => {
+    expect(applyActivity(baseResources, 'cardio', 5).slipstream).toBe(
       baseResources.slipstream
     );
     expect(applyActivity(baseResources, 'strength', 5).strikes).toBe(
       baseResources.strikes
     );
   });
-  it('uses floor so partial threshold does not grant extra unit', () => {
-    expect(applyActivity(baseResources, 'cardio', 39).slipstream).toBe(
-      baseResources.slipstream + 1
+  it('grants half point for 10–19 min', () => {
+    expect(applyActivity(baseResources, 'cardio', 10).slipstream).toBe(
+      baseResources.slipstream + 0.5
+    );
+    expect(applyActivity(baseResources, 'strength', 15).strikes).toBe(
+      baseResources.strikes + 0.5
     );
   });
-  it('adds boost from stats when options provided', () => {
+  it('rounds down to half so 39 min = 1.5 points', () => {
+    expect(applyActivity(baseResources, 'cardio', 39).slipstream).toBe(
+      baseResources.slipstream + 1.5
+    );
+  });
+  it('adds boost from stats when options provided (one roll per full point)', () => {
     const stats: CharacterStats = { brawn: 2, flow: 0, haste: 1, focus: -1 };
     vi.spyOn(Math, 'random').mockReturnValue(0.05); // 2 * 0.1 = 0.2 > 0.05 => +1 boost
-    const next = applyActivity(baseResources, 'strength', 15, { stats });
-    expect(next.strikes).toBe(baseResources.strikes + 1 + 1); // 1 unit + 1 boost
+    const next = applyActivity(baseResources, 'strength', 20, { stats }); // 1 full point => 1 boost roll
+    expect(next.strikes).toBe(baseResources.strikes + 1 + 1); // 1 point + 1 boost
     vi.restoreAllMocks();
   });
   it('momentum-strike intercept grants +1 Strike on strength', () => {
     const stats: CharacterStats = { brawn: 0, flow: 0, haste: 0, focus: 0 };
-    const next = applyActivity(baseResources, 'strength', 15, { stats, startingMoveId: 'momentum-strike' });
-    expect(next.strikes).toBe(baseResources.strikes + 1 + 1); // 1 unit + intercept
+    const next = applyActivity(baseResources, 'strength', 20, { stats, startingMoveId: 'momentum-strike' });
+    expect(next.strikes).toBe(baseResources.strikes + 1 + 1); // 1 point + intercept
   });
   it('aether-cascade intercept grants +1 Aether on yoga when roll < 0.5', () => {
     const stats: CharacterStats = { brawn: 0, flow: 0, haste: 0, focus: 0 };

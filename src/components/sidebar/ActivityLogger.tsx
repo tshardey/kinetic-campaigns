@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Footprints, Sword, Shield, Flame } from 'lucide-react';
 import type { ActivityType } from '@/types/character';
-import { ACTIVITY_MINUTES_PER_UNIT } from '@/engine/resources';
+import { ACTIVITY_MINUTES_PER_POINT } from '@/engine/resources';
 
 interface ActivityLoggerProps {
   onLogActivity: (type: ActivityType, durationMinutes?: number) => void;
@@ -12,7 +12,6 @@ const ACTIVITIES: Array<{
   label: string;
   icon: typeof Footprints;
   unitLabel: string;
-  minutesPerUnit: number;
   bgClass: string;
   borderClass: string;
   textClass: string;
@@ -23,7 +22,6 @@ const ACTIVITIES: Array<{
     label: 'Cardio',
     icon: Footprints,
     unitLabel: 'Slipstream',
-    minutesPerUnit: 20,
     bgClass: 'bg-teal-500/10 hover:bg-teal-500/20',
     borderClass: 'border-teal-500/20',
     textClass: 'text-teal-300',
@@ -34,7 +32,6 @@ const ACTIVITIES: Array<{
     label: 'Strength',
     icon: Sword,
     unitLabel: 'Strike',
-    minutesPerUnit: 15,
     bgClass: 'bg-orange-500/10 hover:bg-orange-500/20',
     borderClass: 'border-orange-500/20',
     textClass: 'text-orange-300',
@@ -45,7 +42,6 @@ const ACTIVITIES: Array<{
     label: 'Agility',
     icon: Shield,
     unitLabel: 'Ward',
-    minutesPerUnit: 20,
     bgClass: 'bg-blue-500/10 hover:bg-blue-500/20',
     borderClass: 'border-blue-500/20',
     textClass: 'text-blue-300',
@@ -56,7 +52,6 @@ const ACTIVITIES: Array<{
     label: 'Wellness / Prep',
     icon: Flame,
     unitLabel: 'Aether',
-    minutesPerUnit: 15,
     bgClass: 'bg-purple-500/10 hover:bg-purple-500/20',
     borderClass: 'border-purple-500/20',
     textClass: 'text-purple-300',
@@ -66,10 +61,10 @@ const ACTIVITIES: Array<{
 
 export function ActivityLogger({ onLogActivity }: ActivityLoggerProps) {
   const [duration, setDuration] = useState<Record<ActivityType, number>>({
-    cardio: 20,
-    strength: 15,
-    yoga: 20,
-    wellness: 15,
+    cardio: ACTIVITY_MINUTES_PER_POINT,
+    strength: ACTIVITY_MINUTES_PER_POINT,
+    yoga: ACTIVITY_MINUTES_PER_POINT,
+    wellness: ACTIVITY_MINUTES_PER_POINT,
   });
 
   return (
@@ -78,10 +73,10 @@ export function ActivityLogger({ onLogActivity }: ActivityLoggerProps) {
         Log Activity
       </h2>
       <p className="text-[11px] text-slate-500 mb-3">
-        Enter minutes; rewards scale by duration (e.g. 20 min cardio = 1 Slipstream).
+        20 min = 1 point for all activities; points round down to the nearest half (e.g. 30 min = 1.5 points).
       </p>
       <div className="space-y-2">
-        {ACTIVITIES.map(({ type, label, icon: Icon, unitLabel, minutesPerUnit, bgClass, borderClass, textClass, examples }) => (
+        {ACTIVITIES.map(({ type, label, icon: Icon, unitLabel, bgClass, borderClass, textClass, examples }) => (
           <div
             key={type}
             className={`flex flex-col gap-1.5 p-3 rounded-lg border ${bgClass} ${borderClass}`}
@@ -93,7 +88,7 @@ export function ActivityLogger({ onLogActivity }: ActivityLoggerProps) {
                 {label}
               </span>
               <span className="text-[10px] text-slate-500 whitespace-nowrap">
-                {minutesPerUnit} min = +1 {unitLabel}
+                20 min = +1 {unitLabel}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -105,16 +100,16 @@ export function ActivityLogger({ onLogActivity }: ActivityLoggerProps) {
                 value={duration[type] || ''}
                 onChange={(e) => {
                   const v = e.target.value === '' ? 0 : parseInt(e.target.value, 10);
-                  setDuration((prev) => ({ ...prev, [type]: isNaN(v) ? ACTIVITY_MINUTES_PER_UNIT[type] : v }));
+                  setDuration((prev) => ({ ...prev, [type]: isNaN(v) ? ACTIVITY_MINUTES_PER_POINT : v }));
                 }}
                 className="w-16 rounded bg-slate-800 border border-slate-600 px-2 py-1 text-sm text-white focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                placeholder={`${minutesPerUnit}`}
+                placeholder={`${ACTIVITY_MINUTES_PER_POINT}`}
                 aria-label={`${label} duration (minutes)`}
               />
               <span className="text-xs text-slate-500">min</span>
               <button
                 type="button"
-                onClick={() => onLogActivity(type, duration[type] || ACTIVITY_MINUTES_PER_UNIT[type])}
+                onClick={() => onLogActivity(type, duration[type] || ACTIVITY_MINUTES_PER_POINT)}
                 className="ml-auto text-xs font-semibold bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded transition-colors"
               >
                 Log

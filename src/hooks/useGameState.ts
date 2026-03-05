@@ -376,16 +376,17 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         return;
       }
 
-      // Retaliation: enemy survived — spend 1 Ward or 1 Aether to absorb, else lose 1 HP
-      const hasWard = nextResources.wards > 0;
-      const hasAether = nextResources.aether >= 1;
-      if (hasWard) {
-        const afterWard = spendWards(nextResources, 1);
-        if (afterWard) setResources(afterWard);
-      } else if (hasAether) {
-        const afterAether = spendAether(nextResources, 1);
-        if (afterAether) setResources(afterAether);
+      // Retaliation: enemy survived — spend 1 Ward or 1 Aether to absorb, else lose 1 HP.
+      // Wards can be fractional (e.g. 0.5), so failed ward spending must still fall through.
+      const afterWard = spendWards(nextResources, 1);
+      if (afterWard) {
+        setResources(afterWard);
       } else {
+        const afterAether = spendAether(nextResources, 1);
+        if (afterAether) {
+          setResources(afterAether);
+          return;
+        }
         // No ward or aether: lose 1 HP; at 0 HP apply knockback (or Defy Reality: sacrifice 1 item, full HP, no knockback)
         const wouldBeZeroHp = character.hp <= 1;
         if (wouldBeZeroHp && character.startingMoveId === 'defy-reality' && inventory.length > 0) {

@@ -81,14 +81,16 @@ The Map contains roughly 60-75 landable hexes, themed to the current 90-day Real
 
 ## **5\. Loot & The Merchant Tent (Real-World Integration)**
 
-In-game Currency dictates real-world wellness and physical hobby spending. Players stock the tent themselves with rewards tailored to their goals.
+In-game Currency dictates real-world wellness and physical hobby spending. Players stock the tent themselves with rewards tailored to their goals. **Currency persists across campaigns**, allowing players to save toward high-tier rewards over multiple 90-day cycles.
 
-* **50 Currency:** A fancy bath product (e.g., Lush bath bomb, fancy Epsom salts).  
-* **150 Currency:** A drop-in personal sauna visit.  
-* **300 Currency:** New workout clothes or gear.  
-* **500 Currency:** A month of a specialty gym or boutique studio membership.  
-* **1,000 Currency:** A professional massage.  
-* **3,000 Currency:** A major wellness trip (e.g., a weekend yoga retreat, hot springs getaway).
+* **50 Currency:** A fancy bath or wellness product (e.g., Lush bath bomb, Epsom salts). \~1 per week.  
+* **100 Currency:** A personal sauna drop-in or drop-in fitness class. \~2 per month.  
+* **200 Currency:** A month of a specialty studio or boutique gym membership. \~1 per month.  
+* **300 Currency:** A professional massage (90-minute deep tissue). \~2 per campaign.  
+* **500 Currency:** Wellness clothing or a fitness device (fresh athletic wear, gadget). \~1 per campaign.  
+* **1,250 Currency:** A local wellness trip or spa day (hot springs getaway, luxury spa). \~1 per 2 campaigns.  
+* **2,000 Currency:** A home gym upgrade (equipment, accessories, or improvements). \~1 per 3 campaigns.  
+* **2,500 Currency:** A fitness retreat (weekend yoga retreat, wellness vacation). \~1 per year.
 
 ## **6\. Progression & Leveling**
 

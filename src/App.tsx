@@ -12,11 +12,14 @@ import { useCampaign } from '@/hooks/useCampaign';
 import { useGameState } from '@/hooks/useGameState';
 
 const MOCK_NEXUS_REWARDS: NexusReward[] = [
-  { id: 1, title: 'Fancy Bath Product', cost: 50, icon: '🛁', desc: 'Lush bath bomb or Epsom salts' },
-  { id: 2, title: 'Personal Sauna Drop-in', cost: 150, icon: '🔥', desc: '1 hour at the local sauna' },
-  { id: 3, title: 'New Workout Gear', cost: 300, icon: '👕', desc: 'Fresh athletic wear' },
-  { id: 4, title: 'Specialty Studio Class', cost: 500, icon: '🧘', desc: 'Drop-in to a premium boutique gym' },
-  { id: 5, title: 'Professional Massage', cost: 1000, icon: '💆', desc: '90-minute deep tissue massage' },
+  { id: 1, title: 'Fancy Bath or Wellness Product', cost: 50, icon: '🛁', desc: 'Lush bath bomb, Epsom salts, or wellness treat (~1/week)' },
+  { id: 2, title: 'Sauna or Fitness Class Drop-in', cost: 100, icon: '🔥', desc: 'Personal sauna visit or drop-in fitness class (~2/month)' },
+  { id: 3, title: 'Specialty Studio Membership', cost: 200, icon: '🧘', desc: 'One month at a boutique studio or premium gym (~1/month)' },
+  { id: 4, title: 'Professional Massage', cost: 300, icon: '💆', desc: '90-minute deep tissue massage (~2/campaign)' },
+  { id: 5, title: 'Wellness Clothing or Device', cost: 500, icon: '👕', desc: 'Fresh athletic wear or a wellness gadget (~1/campaign)' },
+  { id: 6, title: 'Local Wellness Trip or Spa Day', cost: 1250, icon: '🏖️', desc: 'Hot springs getaway or luxury spa day (~1 per 2 campaigns)' },
+  { id: 7, title: 'Home Gym Upgrade', cost: 2000, icon: '🏋️', desc: 'New equipment, accessories, or improvements (~1 per 3 campaigns)' },
+  { id: 8, title: 'Fitness Retreat', cost: 2500, icon: '🏔️', desc: 'Weekend yoga retreat or wellness vacation (~1/year)' },
 ];
 
 function App() {

@@ -20,14 +20,16 @@ The game is designed around 90-day (Quarterly) "Modules" represented by a single
 
 Real-world efforts are standardized so no specific workout is unfairly penalized. These are the energies you use to manipulate reality.
 
+All activities use the same baseline; points round down to the nearest half (no finer fractions).
+
 * **Cardio (Biking, Hiking, Running): Generates *Slipstream Tokens*.**  
-  * *Conversion:* 20 minutes of intentional cardio \= 1 Slipstream Token (moves 1 Hex).  
+  * *Conversion:* 20 minutes \= 1 point (e.g. 30 min \= 1.5 Slipstream).  
 * **Strength/Combat (Weights, Boxing, Krav Maga): Generates *Power Strikes*.**  
-  * *Conversion:* 15 minutes of strength/combat \= 1 Strike. A 45-minute class yields 3 Strikes, allowing Elites to be defeated in a single, intense session.  
+  * *Conversion:* 20 minutes \= 1 point (e.g. 30 min \= 1.5 Strikes).  
 * **Yoga/Mobility: Generates *Wards (Flow)*.**  
-  * *Conversion:* Builds defensive charges to block damage from missed days or boss attacks.  
+  * *Conversion:* 20 minutes \= 1 point; builds defensive charges to block damage from missed days or boss attacks.  
 * **Wellness (Meditation, Real-World Healthy Cooking): Generates *Aether/Focus & Crafting*.**  
-  * *Conversion:* Restores HP/Aether or allows the crafting of buffs from local Encounter Drops at your Basecamp.
+  * *Conversion:* 20 minutes \= 1 point; restores HP/Aether or allows the crafting of buffs from local Encounter Drops at your Basecamp.
 
 ## **3\. Playbooks (Persistent Classes)**
 

@@ -98,7 +98,8 @@ export function EncounterPanel({
 
   if (isVictory) {
     return (
-      <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 bg-slate-800/95 border border-slate-600 p-6 rounded-2xl shadow-2xl w-[28rem] max-w-[95vw] text-center animate-in slide-in-from-bottom-10 fade-in">
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="pointer-events-auto bg-slate-800/95 border border-slate-600 p-6 rounded-2xl shadow-2xl w-[28rem] max-w-[95vw] text-center animate-in zoom-in-95 fade-in">
         {/* Loot frame + item only when there is a loot drop (combat only) */}
         {lootDrop && (
           <div className="flex justify-center mb-4">
@@ -152,12 +153,14 @@ export function EncounterPanel({
         >
           Continue
         </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 bg-slate-800/95 border border-slate-600 p-0 rounded-2xl shadow-2xl w-[28rem] max-w-[95vw] overflow-hidden animate-in slide-in-from-bottom-10 fade-in max-h-[90vh] flex flex-col">
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div className="pointer-events-auto bg-slate-800/95 border border-slate-600 p-0 rounded-2xl shadow-2xl w-[28rem] max-w-[95vw] overflow-hidden animate-in zoom-in-95 fade-in max-h-[90vh] flex flex-col">
       {/* Artwork: full image visible, no crop; scroll if very tall */}
       {imageUrl && (
         <div className="w-full flex-shrink-0 min-h-32 bg-slate-900 flex items-center justify-center overflow-y-auto py-2 max-h-[min(65vh,32rem)]">
@@ -266,6 +269,7 @@ export function EncounterPanel({
             </button>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

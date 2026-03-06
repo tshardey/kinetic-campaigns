@@ -167,57 +167,57 @@ export function HexGrid({
           })}
           </g>
         </svg>
-      </div>
 
-      {showRiftPanel && rift && character && resources !== undefined && (
-        <NarrativeRiftPanel
-          rift={rift}
-          character={character}
-          resources={resources}
-          completedStages={completedRiftStages}
-          isJustCompleted={showVictory}
-          lootFrameUrl={lootFrameUrl}
-          onAttemptStage={(stageIndex) => onAttemptRiftStage(playerHexId, rift.id, stageIndex)}
-          onContinue={onContinueFromVictory}
-          onLeave={() => setDismissedRiftHexId(playerHexId)}
-        />
-      )}
-      {showEncounterPanel && currentEncounter && (
-        <EncounterPanel
-          remainingHits={encounterHealth?.[playerHexId]}
-          encounter={currentEncounter}
-          campaign={campaign}
-          lootFrameUrl={lootFrameUrl}
-          isVictory={showVictory}
-          resources={resources}
-          onEngage={() => onEngageEncounter(playerHexId, currentEncounter)}
-          onContinue={onContinueFromVictory}
-          onPhaseStrike={
-            character?.startingMoveId === 'phase-strike' && (currentEncounter.type === 'basic' || currentEncounter.type === 'elite' || currentEncounter.type === 'boss')
-              ? () => onEngageEncounter(playerHexId, currentEncounter, { phaseStrike: true })
-              : undefined
-          }
-          canPhaseStrike={
-            !!resources &&
-            character?.startingMoveId === 'phase-strike' &&
-            resources.slipstream >= 3 &&
-            (currentEncounter.type === 'basic' || currentEncounter.type === 'elite' || currentEncounter.type === 'boss')
-          }
-          onDimensionalAnchor={
-            useDimensionalAnchor && (currentEncounter.type === 'elite' || currentEncounter.type === 'boss')
-              ? () => useDimensionalAnchor(playerHexId)
-              : undefined
-          }
-          canDimensionalAnchor={
-            !!useDimensionalAnchor &&
-            !!resources &&
-            character?.startingMoveId === 'dimensional-anchor' &&
-            (currentEncounter.type === 'elite' || currentEncounter.type === 'boss') &&
-            !anchorUses[playerHexId] &&
-            resources.aether >= 2
-          }
-        />
-      )}
+        {showRiftPanel && rift && character && resources !== undefined && (
+          <NarrativeRiftPanel
+            rift={rift}
+            character={character}
+            resources={resources}
+            completedStages={completedRiftStages}
+            isJustCompleted={showVictory}
+            lootFrameUrl={lootFrameUrl}
+            onAttemptStage={(stageIndex) => onAttemptRiftStage(playerHexId, rift.id, stageIndex)}
+            onContinue={onContinueFromVictory}
+            onLeave={() => setDismissedRiftHexId(playerHexId)}
+          />
+        )}
+        {showEncounterPanel && currentEncounter && (
+          <EncounterPanel
+            remainingHits={encounterHealth?.[playerHexId]}
+            encounter={currentEncounter}
+            campaign={campaign}
+            lootFrameUrl={lootFrameUrl}
+            isVictory={showVictory}
+            resources={resources}
+            onEngage={() => onEngageEncounter(playerHexId, currentEncounter)}
+            onContinue={onContinueFromVictory}
+            onPhaseStrike={
+              character?.startingMoveId === 'phase-strike' && (currentEncounter.type === 'basic' || currentEncounter.type === 'elite' || currentEncounter.type === 'boss')
+                ? () => onEngageEncounter(playerHexId, currentEncounter, { phaseStrike: true })
+                : undefined
+            }
+            canPhaseStrike={
+              !!resources &&
+              character?.startingMoveId === 'phase-strike' &&
+              resources.slipstream >= 3 &&
+              (currentEncounter.type === 'basic' || currentEncounter.type === 'elite' || currentEncounter.type === 'boss')
+            }
+            onDimensionalAnchor={
+              useDimensionalAnchor && (currentEncounter.type === 'elite' || currentEncounter.type === 'boss')
+                ? () => useDimensionalAnchor(playerHexId)
+                : undefined
+            }
+            canDimensionalAnchor={
+              !!useDimensionalAnchor &&
+              !!resources &&
+              character?.startingMoveId === 'dimensional-anchor' &&
+              (currentEncounter.type === 'elite' || currentEncounter.type === 'boss') &&
+              !anchorUses[playerHexId] &&
+              resources.aether >= 2
+            }
+          />
+        )}
+      </div>
     </div>
   );
 }

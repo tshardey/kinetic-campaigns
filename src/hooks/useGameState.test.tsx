@@ -353,6 +353,7 @@ describe('useGameState', () => {
       );
       act(() => result.current.setCharacter(noWardsWithAether));
       act(() => result.current.setPlayerPos({ q: 0, r: 2 }));
+      act(() => result.current.setEncounterHealth({ '0,2': 2 }));
 
       act(() => result.current.engageEncounter('0,2', twoStrikeEncounter));
 
@@ -373,6 +374,7 @@ describe('useGameState', () => {
       );
       act(() => result.current.setCharacter(fractionalWardsWithAether));
       act(() => result.current.setPlayerPos({ q: 0, r: 2 }));
+      act(() => result.current.setEncounterHealth({ '0,2': 2 }));
 
       act(() => result.current.engageEncounter('0,2', twoStrikeEncounter));
 
@@ -394,6 +396,7 @@ describe('useGameState', () => {
       );
       act(() => result.current.setCharacter(fractionalWardsNoAether));
       act(() => result.current.setPlayerPos({ q: 0, r: 2 }));
+      act(() => result.current.setEncounterHealth({ '0,2': 2 }));
 
       act(() => result.current.engageEncounter('0,2', twoStrikeEncounter));
 
@@ -945,6 +948,7 @@ describe('useGameState', () => {
       );
       act(() => result.current.setCharacter(gateCrasherDefy));
       act(() => result.current.setPlayerPos({ q: 0, r: 2 }));
+      act(() => result.current.setEncounterHealth({ '0,2': 2 }));
       const startPos = { ...result.current.playerPos };
       const currencyBefore = result.current.progression.currency;
 

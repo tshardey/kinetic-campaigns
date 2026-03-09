@@ -85,6 +85,11 @@ describe('game-state-storage', () => {
       expect(map.encounterHealth).toEqual({});
     });
 
+    it('returns empty contactedHexes', () => {
+      const map = getDefaultMapState(COLS, ROWS);
+      expect(map.contactedHexes).toEqual([]);
+    });
+
     it('returns different playerPos for different grid sizes', () => {
       const map14x9 = getDefaultMapState(14, 9);
       const map8x6 = getDefaultMapState(8, 6);
@@ -156,6 +161,20 @@ describe('game-state-storage', () => {
       saveGameState(state);
       const loaded = loadGameState(COLS, ROWS);
       expect(loaded!.mapState.encounterHealth).toEqual({ '3,4': 2, '5,6': 1 });
+    });
+
+    it('persists and restores contactedHexes', () => {
+      const mapState: MapState = {
+        ...getDefaultMapState(COLS, ROWS),
+        contactedHexes: ['1,2', '3,4'],
+      };
+      const state: PersistedGameState = {
+        character: validCharacter,
+        mapState,
+      };
+      saveGameState(state);
+      const loaded = loadGameState(COLS, ROWS);
+      expect(loaded!.mapState.contactedHexes).toEqual(['1,2', '3,4']);
     });
   });
 

@@ -16,8 +16,68 @@ import { getDefaultStartHexId } from '@/engine/encounter-placement';
 import { applyArtifactOnAcquisition, getConsumableEffect, lootDropToInventoryItem } from '@/engine/inventory';
 import { canAffordRiftStage, spendForRiftStage } from '@/engine/rift';
 import { loadGameState, saveGameState, getDefaultMapState } from '@/lib/game-state-storage';
+import { rollEnemyHp } from '@/engine/enemy-scaling';
+import { getCharacterMoveIds, hasCharacterMove } from '@/lib/character-moves';
 
 const DEFAULT_RESOURCES: CharacterResources = { slipstream: 5, strikes: 2, wards: 0, aether: 1 };
+
+/** Outcome of applying 1 point of damage (Ward > Aether > HP, with Defy Reality at 0 HP). */
+export type DamageOutcome = 'ward' | 'aether' | 'hp' | 'defy-reality';
+
+export interface ApplyDamageContext {
+  resources: CharacterResources;
+  character: Character | null;
+  inventory: InventoryItem[];
+  setResources: React.Dispatch<React.SetStateAction<CharacterResources>>;
+  setCharacterState: React.Dispatch<React.SetStateAction<Character | null>>;
+  setPlayerPos: React.Dispatch<React.SetStateAction<{ q: number; r: number }>>;
+  setProgression: React.Dispatch<React.SetStateAction<Progression>>;
+  setInventory: React.Dispatch<React.SetStateAction<InventoryItem[]>>;
+  getStartPos: () => { q: number; r: number };
+  notify: (message: string, type?: 'info' | 'error') => void;
+  /** When false, do not show the knockback message (caller will show context-appropriate message). Default true. */
+  notifyKnockback?: boolean;
+}
+
+/**
+ * Apply 1 point of damage: spend 1 Ward, else 1 Aether, else lose 1 HP.
+ * At 0 HP: Defy Reality (if available) sacrifices 1 item and restores full HP; else knockback to start and currency penalty.
+ * Returns the outcome so the caller can show an appropriate message.
+ */
+export function applyDamage(ctx: ApplyDamageContext): DamageOutcome {
+  const { resources, character, inventory, setResources, setCharacterState, setPlayerPos, setProgression, setInventory, getStartPos, notify, notifyKnockback = true } = ctx;
+  const afterWard = spendWards(resources, 1);
+  if (afterWard) {
+    setResources(afterWard);
+    return 'ward';
+  }
+  const afterAether = spendAether(resources, 1);
+  if (afterAether) {
+    setResources(afterAether);
+    return 'aether';
+  }
+  if (!character) return 'hp';
+  const wouldBeZeroHp = character.hp <= 1;
+  if (wouldBeZeroHp && hasCharacterMove(character, 'defy-reality') && inventory.length > 0) {
+    setInventory((prev) => (prev.length <= 1 ? [] : prev.slice(1)));
+    setCharacterState((prev) => (prev ? { ...prev, hp: prev.maxHp ?? 5 } : null));
+    return 'defy-reality';
+  }
+  if (wouldBeZeroHp && notifyKnockback) {
+    notify('You hit zero health and are returning to the starting point.', 'info');
+  }
+  setCharacterState((prev) => {
+    if (!prev) return null;
+    const newHp = Math.max(0, prev.hp - 1);
+    if (newHp > 0) return { ...prev, hp: newHp };
+    return { ...prev, hp: prev.maxHp ?? 5 };
+  });
+  if (wouldBeZeroHp) {
+    setPlayerPos(getStartPos());
+    setProgression((p) => ({ ...p, currency: Math.max(0, p.currency - 50) }));
+  }
+  return 'hp';
+}
 const DEFAULT_PROGRESSION: Progression = { xp: 0, level: 1, currency: 0 };
 
 export interface GameStateHookParams {
@@ -120,6 +180,10 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
     const loaded = loadGameState(cols, rows);
     return loaded?.mapState?.anchorUses ?? defaultMap.anchorUses ?? {};
   });
+  const [contactedHexes, setContactedHexes] = useState<Set<string>>(() => {
+    const loaded = loadGameState(cols, rows);
+    return loaded?.mapState?.contactedHexes ? new Set(loaded.mapState.contactedHexes) : new Set();
+  });
   const [justClearedHexId, setJustClearedHexId] = useState<string | null>(null);
   const [riftProgress, setRiftProgress] = useState<RiftProgress>(() => {
     const loaded = loadGameState(cols, rows);
@@ -149,6 +213,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
           setClearedHexes(new Set(def.clearedHexes));
           setEncounterHealth(def.encounterHealth ?? {});
           setAnchorUses(def.anchorUses ?? {});
+          setContactedHexes(new Set(def.contactedHexes ?? []));
           setRiftProgress(def.riftProgress ?? {});
           setCampaignStatus(def.campaignStatus ?? 'active');
           setResources(next.resources);
@@ -163,7 +228,17 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
 
   const logWorkout = useCallback((type: ActivityType, durationMinutes?: number) => {
     setResources((prev) =>
-      applyActivity(prev, type, durationMinutes, character ? { stats: character.stats, startingMoveId: character.startingMoveId } : undefined)
+      applyActivity(
+        prev,
+        type,
+        durationMinutes,
+        character
+          ? {
+              stats: character.stats,
+              activeMoveIds: Array.from(getCharacterMoveIds(character)),
+            }
+          : undefined
+      )
     );
   }, [character]);
 
@@ -188,9 +263,52 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         return next;
       });
       setPlayerPos({ q, r });
+
+      // Contact damage: first time entering an uncleared combat hex, enemy deals 1 damage (Ward > Aether > HP).
+      const encounter = placedEncounters[id];
+      const isCombat = encounter && encounter.type !== 'anomaly';
+      const uncleared = encounter && !clearedHexes.has(id);
+      const firstContact = isCombat && uncleared && !contactedHexes.has(id);
+      if (firstContact && character) {
+        setContactedHexes((prev) => new Set(prev).add(id));
+        const rolledHp = encounterHealth[id] ?? rollEnemyHp(encounter.type, progression.level);
+        if (encounterHealth[id] === undefined) {
+          setEncounterHealth((prev) => ({ ...prev, [id]: rolledHp }));
+        }
+        const outcome = applyDamage({
+          resources: nextResources,
+          character,
+          inventory,
+          setResources,
+          setCharacterState,
+          setPlayerPos,
+          setProgression,
+          setInventory,
+          getStartPos: () => {
+            const start = campaign.realm.startingHex;
+            if (start) return start;
+            const startHexId = getDefaultStartHexId(cols, rows);
+            const [q, r] = startHexId.split(',').map(Number);
+            return { q, r };
+          },
+          notify,
+          notifyKnockback: false,
+        });
+        const enemyName = encounter.name ?? 'enemy';
+        const msg =
+          outcome === 'ward'
+            ? `You stumbled into ${enemyName}! Lost 1 Ward.`
+            : outcome === 'aether'
+              ? `You stumbled into ${enemyName}! Lost 1 Aether.`
+              : outcome === 'defy-reality'
+                ? `You stumbled into ${enemyName}! Defy Reality: sacrificed an item.`
+                : `You stumbled into ${enemyName}! Lost 1 HP.`;
+        notify(msg, 'info');
+      }
+
       // Slipstream Surge (Wayfinder): moving to cleared/empty hex, 30% chance to restore 1 HP
       if (
-        character?.startingMoveId === 'slipstream-surge' &&
+        hasCharacterMove(character, 'slipstream-surge') &&
         (clearedHexes.has(id) || !placedEncounters[id]) &&
         Math.random() < 0.3
       ) {
@@ -203,7 +321,21 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         });
       }
     },
-    [resources, playerPos, notify, character?.startingMoveId, clearedHexes, placedEncounters]
+    [
+      resources,
+      playerPos,
+      notify,
+      character,
+      clearedHexes,
+      placedEncounters,
+      contactedHexes,
+      encounterHealth,
+      progression.level,
+      inventory,
+      campaign.realm.startingHex,
+      cols,
+      rows,
+    ]
   );
 
   const engageEncounter = useCallback(
@@ -250,12 +382,17 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
       // Combat: spend up to min(available Strikes, enemy remaining HP) per turn; then one retaliation if enemy survives
       if (!character) return;
 
-      const enemyStrikes = encounter.strikes ?? 1;
-      const currentEnemyHp = encounterHealth[hexId] ?? enemyStrikes;
+      let currentEnemyHp: number;
+      if (encounterHealth[hexId] !== undefined) {
+        currentEnemyHp = encounterHealth[hexId]!;
+      } else {
+        currentEnemyHp = rollEnemyHp(encounter.type, progression.level);
+        setEncounterHealth((prev) => ({ ...prev, [hexId]: currentEnemyHp }));
+      }
 
       // Phase Strike (Wayfinder): spend 3 Slipstream, deal 1 damage, no retaliation
       if (options?.phaseStrike) {
-        if (character.startingMoveId !== 'phase-strike') {
+        if (!hasCharacterMove(character, 'phase-strike')) {
           notify('Phase Strike is a Wayfinder move.', 'error');
           return;
         }
@@ -300,8 +437,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
               });
             }
           }
-          const startingMoveId: string = character.startingMoveId;
-          if (startingMoveId === 'aura-of-conquest') {
+          if (hasCharacterMove(character, 'aura-of-conquest')) {
             setResources((r) => ({ ...r, wards: r.wards + 1 }));
           }
           setAnchorUses((prev) => {
@@ -364,7 +500,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
             }
           }
         }
-        if (character.startingMoveId === 'aura-of-conquest') {
+        if (hasCharacterMove(character, 'aura-of-conquest')) {
           setResources((r) => ({ ...r, wards: r.wards + 1 }));
         }
         setAnchorUses((prev) => {
@@ -376,49 +512,31 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         return;
       }
 
-      // Retaliation: enemy survived — spend 1 Ward or 1 Aether to absorb, else lose 1 HP.
-      // Wards can be fractional (e.g. 0.5), so failed ward spending must still fall through.
-      const afterWard = spendWards(nextResources, 1);
-      if (afterWard) {
-        setResources(afterWard);
-      } else {
-        const afterAether = spendAether(nextResources, 1);
-        if (afterAether) {
-          setResources(afterAether);
-          return;
-        }
-        // No ward or aether: lose 1 HP; at 0 HP apply knockback (or Defy Reality: sacrifice 1 item, full HP, no knockback)
-        const wouldBeZeroHp = character.hp <= 1;
-        if (wouldBeZeroHp && character.startingMoveId === 'defy-reality' && inventory.length > 0) {
-          setInventory((prev) => (prev.length <= 1 ? [] : prev.slice(1)));
-          setCharacterState((prev) => (prev ? { ...prev, hp: prev.maxHp ?? 5 } : null));
-          return;
-        }
-        if (wouldBeZeroHp) {
-          notify('You hit zero health and are returning to the starting point.', 'info');
-        }
-        setCharacterState((prev) => {
-          if (!prev) return null;
-          const newHp = Math.max(0, prev.hp - 1);
-          if (newHp > 0) return { ...prev, hp: newHp };
-          return { ...prev, hp: prev.maxHp ?? 5 };
-        });
-        if (wouldBeZeroHp) {
-          const start =
-            campaign.realm.startingHex ?? (() => {
-              const startHexId = getDefaultStartHexId(cols, rows);
-              const [q, r] = startHexId.split(',').map(Number);
-              return { q, r };
-            })();
-          setPlayerPos(start);
-          setProgression((p) => ({ ...p, currency: Math.max(0, p.currency - 50) }));
-        }
-      }
+      // Retaliation: enemy survived — apply 1 damage (Ward > Aether > HP, with Defy Reality at 0 HP).
+      applyDamage({
+        resources: nextResources,
+        character,
+        inventory,
+        setResources,
+        setCharacterState,
+        setPlayerPos,
+        setProgression,
+        setInventory,
+        getStartPos: () => {
+          const start = campaign.realm.startingHex;
+          if (start) return start;
+          const startHexId = getDefaultStartHexId(cols, rows);
+          const [q, r] = startHexId.split(',').map(Number);
+          return { q, r };
+        },
+        notify,
+      });
     },
     [
       resources,
       character,
       encounterHealth,
+      progression.level,
       clearedHexes,
       inventory,
       riftProgress,
@@ -446,7 +564,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         notify('Need 2 Aether for Dimensional Anchor.', 'error');
         return false;
       }
-      if (!character || character.startingMoveId !== 'dimensional-anchor') {
+      if (!character || !hasCharacterMove(character, 'dimensional-anchor')) {
         notify('Dimensional Anchor is a Rift-Weaver move.', 'error');
         return false;
       }
@@ -494,8 +612,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
             });
           }
         }
-        const startingMoveId: string = character.startingMoveId;
-        if (startingMoveId === 'aura-of-conquest') {
+        if (hasCharacterMove(character, 'aura-of-conquest')) {
           setResources((r) => ({ ...r, wards: r.wards + 1 }));
         }
         setAnchorUses((prev) => {
@@ -519,7 +636,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
   );
 
   const nexusSynthesizerHeal = useCallback((): boolean => {
-    if (!character || character.startingMoveId !== 'nexus-synthesizer') {
+    if (!character || !hasCharacterMove(character, 'nexus-synthesizer')) {
       notify('Nexus Synthesizer is a Rift-Weaver move.', 'error');
       return false;
     }
@@ -543,7 +660,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
 
   const onScoutHex = useCallback(
     (hexId: string): boolean => {
-      if (!character || character.startingMoveId !== 'scout-the-multiverse') {
+      if (!character || !hasCharacterMove(character, 'scout-the-multiverse')) {
         notify('Scout the Multiverse is a Wayfinder move.', 'error');
         return false;
       }
@@ -638,7 +755,12 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         if (!prev) return null;
         const updated =
           choice.type === 'new_move' || choice.type === 'cross_class_move'
-            ? { ...prev, learnedMoveIds: [...(prev.learnedMoveIds ?? []), choice.moveId] }
+            ? {
+                ...prev,
+                learnedMoveIds: Array.from(
+                  new Set([...(prev.learnedMoveIds ?? []), choice.moveId])
+                ),
+              }
             : { ...prev, stats: { ...prev.stats, [choice.stat]: prev.stats[choice.stat] + 1 } };
         return { ...updated, hp: updated.maxHp ?? 5 };
       });
@@ -708,11 +830,12 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         encounterHealth,
         campaignStatus,
         anchorUses,
+        contactedHexes: Array.from(contactedHexes),
       },
       pendingLevelUp: pendingLevelUp || undefined,
       pendingProgressionAfterLevelUp: pendingProgressionAfterLevelUp ?? undefined,
     });
-  }, [character, resources, progression, inventory, playerPos, revealedHexes, clearedHexes, encounterHealth, anchorUses, riftProgress, campaignStatus, pendingLevelUp, pendingProgressionAfterLevelUp]);
+  }, [character, resources, progression, inventory, playerPos, revealedHexes, clearedHexes, encounterHealth, anchorUses, contactedHexes, riftProgress, campaignStatus, pendingLevelUp, pendingProgressionAfterLevelUp]);
 
   return {
     character,

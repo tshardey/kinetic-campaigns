@@ -6,9 +6,11 @@
 import type { CharacterResources, CharacterStats, ActivityType } from '@/types/character';
 import type { AnomalyResourceType } from '@/types/campaign';
 
-/** Options for applyActivity: stats enable the boost mechanic; startingMoveId enables playbook intercepts. */
+/** Options for applyActivity: stats enable boosts; activeMoveIds enables move intercepts. */
 export interface ApplyActivityOptions {
   stats: CharacterStats;
+  activeMoveIds?: string[];
+  /** @deprecated Prefer activeMoveIds; kept for backward compatibility in tests/callers. */
   startingMoveId?: string;
 }
 
@@ -69,6 +71,10 @@ export function applyActivity(
   options?: ApplyActivityOptions
 ): CharacterResources {
   const next = { ...current };
+  const activeMoves = new Set<string>([
+    ...(options?.activeMoveIds ?? []),
+    ...(options?.startingMoveId ? [options.startingMoveId] : []),
+  ]);
   const points =
     durationMinutes != null && durationMinutes > 0
       ? activityPointsFromMinutes(durationMinutes)
@@ -102,10 +108,10 @@ export function applyActivity(
   }
 
   // Playbook intercepts
-  if (options?.startingMoveId === 'momentum-strike' && activity === 'strength') {
+  if (activeMoves.has('momentum-strike') && activity === 'strength') {
     next.strikes += 1;
   }
-  if (options?.startingMoveId === 'aether-cascade' && activity === 'yoga' && Math.random() < 0.5) {
+  if (activeMoves.has('aether-cascade') && activity === 'yoga' && Math.random() < 0.5) {
     next.aether += 1;
   }
 

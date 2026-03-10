@@ -353,6 +353,7 @@ describe('useGameState', () => {
       );
       act(() => result.current.setCharacter(noWardsWithAether));
       act(() => result.current.setPlayerPos({ q: 0, r: 2 }));
+      act(() => result.current.setEncounterHealth({ '0,2': 2 }));
 
       act(() => result.current.engageEncounter('0,2', twoStrikeEncounter));
 
@@ -373,6 +374,7 @@ describe('useGameState', () => {
       );
       act(() => result.current.setCharacter(fractionalWardsWithAether));
       act(() => result.current.setPlayerPos({ q: 0, r: 2 }));
+      act(() => result.current.setEncounterHealth({ '0,2': 2 }));
 
       act(() => result.current.engageEncounter('0,2', twoStrikeEncounter));
 
@@ -394,6 +396,7 @@ describe('useGameState', () => {
       );
       act(() => result.current.setCharacter(fractionalWardsNoAether));
       act(() => result.current.setPlayerPos({ q: 0, r: 2 }));
+      act(() => result.current.setEncounterHealth({ '0,2': 2 }));
 
       act(() => result.current.engageEncounter('0,2', twoStrikeEncounter));
 
@@ -870,6 +873,26 @@ describe('useGameState', () => {
       expect(result.current.character!.hp).toBe(5);
     });
 
+    it('works when Phase Strike is learned via level-up', () => {
+      const learnedPhaseStrike: Character = {
+        ...validCharacter,
+        learnedMoveIds: ['phase-strike'],
+        resources: { ...validCharacter.resources, slipstream: 4, strikes: 0 },
+      };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      act(() => result.current.setCharacter(learnedPhaseStrike));
+      act(() => result.current.setPlayerPos({ q: 0, r: 3 }));
+
+      act(() => {
+        result.current.engageEncounter('0,3', basicEncounter, { phaseStrike: true });
+      });
+
+      expect(result.current.resources.slipstream).toBe(1);
+      expect(result.current.clearedHexes.has('0,3')).toBe(true);
+    });
+
     it('notifies when not Wayfinder with Phase Strike', () => {
       const toast = vi.fn();
       const { result } = renderHook(() =>
@@ -945,6 +968,7 @@ describe('useGameState', () => {
       );
       act(() => result.current.setCharacter(gateCrasherDefy));
       act(() => result.current.setPlayerPos({ q: 0, r: 2 }));
+      act(() => result.current.setEncounterHealth({ '0,2': 2 }));
       const startPos = { ...result.current.playerPos };
       const currencyBefore = result.current.progression.currency;
 
@@ -1047,6 +1071,30 @@ describe('useGameState', () => {
 
       expect(ok).toBe(true);
       expect(result.current.revealedHexes.has(hexToReveal)).toBe(true);
+      expect(result.current.resources.aether).toBe(1);
+    });
+
+    it('works when Scout the Multiverse is learned via level-up', () => {
+      const defaultMap = getDefaultMapState(COLS, ROWS, campaign.realm.startingHex);
+      const ring2 = getHexIdsAtDistance(defaultMap.playerPos.q, defaultMap.playerPos.r, 2);
+      const hexId = ring2[0];
+      const withLearnedScout: Character = {
+        ...validCharacter,
+        learnedMoveIds: ['scout-the-multiverse'],
+        resources: { ...validCharacter.resources, aether: 2 },
+      };
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      act(() => result.current.setCharacter(withLearnedScout));
+
+      let ok = false;
+      act(() => {
+        ok = result.current.onScoutHex(hexId);
+      });
+
+      expect(ok).toBe(true);
+      expect(result.current.revealedHexes.has(hexId)).toBe(true);
       expect(result.current.resources.aether).toBe(1);
     });
 

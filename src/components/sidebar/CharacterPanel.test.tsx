@@ -64,6 +64,17 @@ describe('CharacterPanel', () => {
       fireEvent.click(toggle);
       expect(toggle).toHaveAttribute('aria-expanded', 'true');
     });
+
+    it('shows learned moves on the character sheet', () => {
+      render(
+        <CharacterPanel
+          {...defaultProps}
+          character={{ ...mockCharacter, learnedMoveIds: ['scout-the-multiverse'] }}
+        />
+      );
+      expect(screen.getByText('Momentum Strike')).toBeInTheDocument();
+      expect(screen.getByText('Scout the Multiverse')).toBeInTheDocument();
+    });
   });
 
   describe('Inventory section', () => {

@@ -87,6 +87,20 @@ describe('LevelUpModal', () => {
     });
   });
 
+  it('does not offer cross-class moves already learned', () => {
+    const onChoose = vi.fn();
+    render(
+      <LevelUpModal
+        character={{ ...baseCharacter, learnedMoveIds: ['aether-shield'] }}
+        newLevel={2}
+        onChoose={onChoose}
+      />
+    );
+
+    fireEvent.click(screen.getByText(/Cross-class move/));
+    expect(screen.queryByRole('button', { name: /Aether Shield/i })).not.toBeInTheDocument();
+  });
+
   it('Back button returns to pick step', () => {
     const onChoose = vi.fn();
     render(

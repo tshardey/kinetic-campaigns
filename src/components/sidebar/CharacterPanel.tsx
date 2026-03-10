@@ -3,9 +3,10 @@ import { Sparkles, BookOpen, ChevronDown, ChevronUp, Package, X } from 'lucide-r
 import type { Character, CharacterResources, Progression, InventoryItem } from '@/types/character';
 import type { ActivityType } from '@/types/character';
 import { getXpCap } from '@/engine/progression';
-import { getPlaybook } from '@/data/playbooks';
+import { getPlaybook, PLAYBOOKS } from '@/data/playbooks';
 import { ResourceDisplay } from './ResourceDisplay';
 import { ActivityLogger } from './ActivityLogger';
+import { hasCharacterMove } from '@/lib/character-moves';
 
 interface CharacterPanelProps {
   character: Character;
@@ -38,7 +39,11 @@ export function CharacterPanel({
   const xpCap = getXpCap(progression.level);
   const xpPercent = (progression.xp / xpCap) * 100;
   const playbook = getPlaybook(character.playbook);
-  const startingMove = playbook?.startingMoves.find((m) => m.id === character.startingMoveId);
+  const allMoves = PLAYBOOKS.flatMap((p) => p.startingMoves);
+  const moveIds = Array.from(new Set([character.startingMoveId, ...(character.learnedMoveIds ?? [])]));
+  const activeMoves = moveIds
+    .map((id) => allMoves.find((m) => m.id === id))
+    .filter((move): move is NonNullable<typeof move> => !!move);
 
   return (
     <aside className="w-80 h-full bg-slate-900 border-r border-slate-800 flex flex-col shadow-2xl">
@@ -146,7 +151,7 @@ export function CharacterPanel({
                   Heal (1 Aether → 1 HP)
                 </button>
                 {onNexusSynthesizerHeal &&
-                  character.startingMoveId === 'nexus-synthesizer' &&
+                  hasCharacterMove(character, 'nexus-synthesizer') &&
                   resources.aether >= 2 &&
                   (character.hp ?? 5) < (character.maxHp ?? 5) && (
                     <button
@@ -159,15 +164,21 @@ export function CharacterPanel({
                   )}
               </div>
             )}
-            {startingMove && (
+            {activeMoves.length > 0 && (
               <div className="pt-1 border-t border-slate-700">
                 <p className="text-[10px] uppercase text-slate-500 font-medium mb-0.5">
-                  Starting move
+                  Moves
                 </p>
-                <p className="text-xs font-medium text-white">{startingMove.name}</p>
-                <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">
-                  {startingMove.description}
-                </p>
+                <div className="space-y-1.5">
+                  {activeMoves.map((move) => (
+                    <div key={move.id}>
+                      <p className="text-xs font-medium text-white">{move.name}</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">
+                        {move.description}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

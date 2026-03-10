@@ -16,6 +16,7 @@ import {
 import { HexTile } from './HexTile';
 import { EncounterPanel } from './EncounterPanel';
 import { NarrativeRiftPanel } from '@/components/rift/NarrativeRift';
+import { hasCharacterMove } from '@/lib/character-moves';
 
 interface HexGridProps {
   /** Number of columns (rectangular grid). Use with rows for 16:9 map. */
@@ -136,8 +137,7 @@ export function HexGrid({
             const { x: vx, y: vy } = hexToViewPixel(x, y, bounds, transform);
             const isScoutable =
               !!onScoutHex &&
-              !!character?.startingMoveId &&
-              character.startingMoveId === 'scout-the-multiverse' &&
+              hasCharacterMove(character, 'scout-the-multiverse') &&
               !!resources &&
               resources.aether >= 1 &&
               !revealedHexes.has(hex.id) &&
@@ -192,13 +192,13 @@ export function HexGrid({
             onEngage={() => onEngageEncounter(playerHexId, currentEncounter)}
             onContinue={onContinueFromVictory}
             onPhaseStrike={
-              character?.startingMoveId === 'phase-strike' && (currentEncounter.type === 'basic' || currentEncounter.type === 'elite' || currentEncounter.type === 'boss')
+              hasCharacterMove(character, 'phase-strike') && (currentEncounter.type === 'basic' || currentEncounter.type === 'elite' || currentEncounter.type === 'boss')
                 ? () => onEngageEncounter(playerHexId, currentEncounter, { phaseStrike: true })
                 : undefined
             }
             canPhaseStrike={
               !!resources &&
-              character?.startingMoveId === 'phase-strike' &&
+              hasCharacterMove(character, 'phase-strike') &&
               resources.slipstream >= 3 &&
               (currentEncounter.type === 'basic' || currentEncounter.type === 'elite' || currentEncounter.type === 'boss')
             }
@@ -210,7 +210,7 @@ export function HexGrid({
             canDimensionalAnchor={
               !!useDimensionalAnchor &&
               !!resources &&
-              character?.startingMoveId === 'dimensional-anchor' &&
+              hasCharacterMove(character, 'dimensional-anchor') &&
               (currentEncounter.type === 'elite' || currentEncounter.type === 'boss') &&
               !anchorUses[playerHexId] &&
               resources.aether >= 2

@@ -27,6 +27,8 @@ export interface MapState {
   campaignStatus?: CampaignStatus;
   /** Per-encounter: whether Dimensional Anchor was already used (hexId -> true). */
   anchorUses?: Record<string, boolean>;
+  /** Hex ids that have already dealt contact damage (once per hex). */
+  contactedHexes?: string[];
 }
 
 export interface PersistedGameState {
@@ -62,6 +64,7 @@ export function getDefaultMapState(
     encounterHealth: {},
     campaignStatus: 'active',
     anchorUses: {},
+    contactedHexes: [],
   };
 }
 
@@ -103,6 +106,7 @@ export function loadGameState(cols: number, rows: number): PersistedGameState | 
             encounterHealth: data.mapState.encounterHealth ?? {},
             campaignStatus: data.mapState.campaignStatus ?? 'active',
             anchorUses: data.mapState.anchorUses ?? {},
+            contactedHexes: data.mapState.contactedHexes ?? [],
           };
           return {
             character: ensureCharacterHp(data.character),

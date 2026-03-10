@@ -28,6 +28,7 @@ export function LevelUpModal({ character, newLevel, onChoose }: LevelUpModalProp
   const otherPlaybooksMoves = PLAYBOOKS.filter((p) => p.id !== character.playbook).flatMap(
     (p) => p.startingMoves
   );
+  const availableCrossPlaybookMoves = otherPlaybooksMoves.filter((m) => !learnedSet.has(m.id));
 
   if (step === 'pick') {
     return (
@@ -127,7 +128,7 @@ export function LevelUpModal({ character, newLevel, onChoose }: LevelUpModalProp
           <h2 className="text-lg font-bold text-white mb-2">Choose a cross-class move</h2>
           <p className="text-sm text-slate-400 mb-4">Learn a move from another playbook.</p>
           <div className="space-y-2">
-            {otherPlaybooksMoves.map((move) => (
+            {availableCrossPlaybookMoves.map((move) => (
               <button
                 key={move.id}
                 type="button"
@@ -139,6 +140,9 @@ export function LevelUpModal({ character, newLevel, onChoose }: LevelUpModalProp
               </button>
             ))}
           </div>
+          {availableCrossPlaybookMoves.length === 0 && (
+            <p className="text-xs text-slate-500">No cross-class moves remaining.</p>
+          )}
           <button
             type="button"
             onClick={() => setStep('pick')}

@@ -17,6 +17,7 @@ import { applyArtifactOnAcquisition, getConsumableEffect, lootDropToInventoryIte
 import { canAffordRiftStage, spendForRiftStage } from '@/engine/rift';
 import { loadGameState, saveGameState, getDefaultMapState } from '@/lib/game-state-storage';
 import { rollEnemyHp } from '@/engine/enemy-scaling';
+import { getCharacterMoveIds, hasCharacterMove } from '@/lib/character-moves';
 
 const DEFAULT_RESOURCES: CharacterResources = { slipstream: 5, strikes: 2, wards: 0, aether: 1 };
 
@@ -57,7 +58,7 @@ export function applyDamage(ctx: ApplyDamageContext): DamageOutcome {
   }
   if (!character) return 'hp';
   const wouldBeZeroHp = character.hp <= 1;
-  if (wouldBeZeroHp && character.startingMoveId === 'defy-reality' && inventory.length > 0) {
+  if (wouldBeZeroHp && hasCharacterMove(character, 'defy-reality') && inventory.length > 0) {
     setInventory((prev) => (prev.length <= 1 ? [] : prev.slice(1)));
     setCharacterState((prev) => (prev ? { ...prev, hp: prev.maxHp ?? 5 } : null));
     return 'defy-reality';
@@ -227,7 +228,17 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
 
   const logWorkout = useCallback((type: ActivityType, durationMinutes?: number) => {
     setResources((prev) =>
-      applyActivity(prev, type, durationMinutes, character ? { stats: character.stats, startingMoveId: character.startingMoveId } : undefined)
+      applyActivity(
+        prev,
+        type,
+        durationMinutes,
+        character
+          ? {
+              stats: character.stats,
+              activeMoveIds: Array.from(getCharacterMoveIds(character)),
+            }
+          : undefined
+      )
     );
   }, [character]);
 
@@ -297,7 +308,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
 
       // Slipstream Surge (Wayfinder): moving to cleared/empty hex, 30% chance to restore 1 HP
       if (
-        character?.startingMoveId === 'slipstream-surge' &&
+        hasCharacterMove(character, 'slipstream-surge') &&
         (clearedHexes.has(id) || !placedEncounters[id]) &&
         Math.random() < 0.3
       ) {
@@ -381,7 +392,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
 
       // Phase Strike (Wayfinder): spend 3 Slipstream, deal 1 damage, no retaliation
       if (options?.phaseStrike) {
-        if (character.startingMoveId !== 'phase-strike') {
+        if (!hasCharacterMove(character, 'phase-strike')) {
           notify('Phase Strike is a Wayfinder move.', 'error');
           return;
         }
@@ -426,8 +437,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
               });
             }
           }
-          const startingMoveId: string = character.startingMoveId;
-          if (startingMoveId === 'aura-of-conquest') {
+          if (hasCharacterMove(character, 'aura-of-conquest')) {
             setResources((r) => ({ ...r, wards: r.wards + 1 }));
           }
           setAnchorUses((prev) => {
@@ -490,7 +500,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
             }
           }
         }
-        if (character.startingMoveId === 'aura-of-conquest') {
+        if (hasCharacterMove(character, 'aura-of-conquest')) {
           setResources((r) => ({ ...r, wards: r.wards + 1 }));
         }
         setAnchorUses((prev) => {
@@ -554,7 +564,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         notify('Need 2 Aether for Dimensional Anchor.', 'error');
         return false;
       }
-      if (!character || character.startingMoveId !== 'dimensional-anchor') {
+      if (!character || !hasCharacterMove(character, 'dimensional-anchor')) {
         notify('Dimensional Anchor is a Rift-Weaver move.', 'error');
         return false;
       }
@@ -602,8 +612,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
             });
           }
         }
-        const startingMoveId: string = character.startingMoveId;
-        if (startingMoveId === 'aura-of-conquest') {
+        if (hasCharacterMove(character, 'aura-of-conquest')) {
           setResources((r) => ({ ...r, wards: r.wards + 1 }));
         }
         setAnchorUses((prev) => {
@@ -627,7 +636,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
   );
 
   const nexusSynthesizerHeal = useCallback((): boolean => {
-    if (!character || character.startingMoveId !== 'nexus-synthesizer') {
+    if (!character || !hasCharacterMove(character, 'nexus-synthesizer')) {
       notify('Nexus Synthesizer is a Rift-Weaver move.', 'error');
       return false;
     }
@@ -651,7 +660,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
 
   const onScoutHex = useCallback(
     (hexId: string): boolean => {
-      if (!character || character.startingMoveId !== 'scout-the-multiverse') {
+      if (!character || !hasCharacterMove(character, 'scout-the-multiverse')) {
         notify('Scout the Multiverse is a Wayfinder move.', 'error');
         return false;
       }
@@ -746,7 +755,12 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         if (!prev) return null;
         const updated =
           choice.type === 'new_move' || choice.type === 'cross_class_move'
-            ? { ...prev, learnedMoveIds: [...(prev.learnedMoveIds ?? []), choice.moveId] }
+            ? {
+                ...prev,
+                learnedMoveIds: Array.from(
+                  new Set([...(prev.learnedMoveIds ?? []), choice.moveId])
+                ),
+              }
             : { ...prev, stats: { ...prev.stats, [choice.stat]: prev.stats[choice.stat] + 1 } };
         return { ...updated, hp: updated.maxHp ?? 5 };
       });

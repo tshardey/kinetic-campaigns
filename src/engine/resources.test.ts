@@ -233,6 +233,11 @@ describe('applyActivity', () => {
     const next = applyActivity(baseResources, 'strength', 20, { stats, startingMoveId: 'momentum-strike' });
     expect(next.strikes).toBe(baseResources.strikes + 1 + 1); // 1 point + intercept
   });
+  it('activeMoveIds also enables move intercepts (for learned moves)', () => {
+    const stats: CharacterStats = { brawn: 0, flow: 0, haste: 0, focus: 0 };
+    const next = applyActivity(baseResources, 'strength', 20, { stats, activeMoveIds: ['momentum-strike'] });
+    expect(next.strikes).toBe(baseResources.strikes + 1 + 1);
+  });
   it('aether-cascade intercept grants +1 Aether on yoga when roll < 0.5', () => {
     const stats: CharacterStats = { brawn: 0, flow: 0, haste: 0, focus: 0 };
     vi.spyOn(Math, 'random').mockReturnValue(0.3);

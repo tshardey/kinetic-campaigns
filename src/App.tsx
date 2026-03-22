@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Map as MapIcon, Tent, PanelLeftClose, PanelLeft, HelpCircle, X } from 'lucide-react';
 import type { NexusReward } from '@/types/campaign';
-import { loadCharacter } from '@/lib/character-storage';
 import { CharacterPanel } from '@/components/sidebar/CharacterPanel';
 import { CharacterCreation } from '@/components/character-creation/CharacterCreation';
 import { HexGrid } from '@/components/hex-grid/HexGrid';
@@ -52,6 +51,7 @@ function AppContent() {
   const {
     character,
     setCharacter,
+    persistHydrated,
     resources,
     progression,
     inventory,
@@ -91,8 +91,26 @@ function AppContent() {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
+  if (!persistHydrated) {
+    return (
+      <div
+        className="min-h-screen bg-slate-950 text-slate-200 font-sans flex items-center justify-center"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <p className="text-slate-400 text-sm">Loading save…</p>
+      </div>
+    );
+  }
+
   if (!character) {
-    return <CharacterCreation onComplete={() => setCharacter(loadCharacter())} />;
+    return (
+      <CharacterCreation
+        campaignId={campaign.realm.id}
+        onComplete={(c) => setCharacter(c)}
+      />
+    );
   }
 
   const newLevel = pendingProgressionAfterLevelUp?.level ?? progression.level + 1;

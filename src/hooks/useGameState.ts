@@ -1,9 +1,11 @@
 /**
  * Manages character, resources, progression, map state, and inventory.
- * Reads from and auto-saves to localStorage on every change.
+ * Persists to Supabase when signed in and configured; otherwise localStorage.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { loadPersistedGameStateFromSupabase, persistGameStateToSupabase } from '@/lib/persist-game-state';
 import type { Character, CharacterResources, Progression, InventoryItem, LevelUpChoice } from '@/types/character';
 import type { ActivityType } from '@/types/character';
 import type { MapEncounter, NexusReward } from '@/types/campaign';
@@ -15,7 +17,7 @@ import { getAdjacentHexIds, getHexIdsAtDistance } from '@/engine/hex-math';
 import { getDefaultStartHexId } from '@/engine/encounter-placement';
 import { applyArtifactOnAcquisition, getConsumableEffect, lootDropToInventoryItem } from '@/engine/inventory';
 import { canAffordRiftStage, spendForRiftStage } from '@/engine/rift';
-import { loadGameState, saveGameState, getDefaultMapState } from '@/lib/game-state-storage';
+import { loadGameStateLocal, saveGameStateLocal, getDefaultMapState, type PersistedGameState } from '@/lib/game-state-storage';
 import { rollEnemyHp } from '@/engine/enemy-scaling';
 import { getCharacterMoveIds, hasCharacterMove } from '@/lib/character-moves';
 
@@ -134,73 +136,129 @@ export interface GameStateHookResult {
   /** Progression to apply after level-up choice. */
   pendingProgressionAfterLevelUp: Progression | null;
   completeLevelUp: (choice: import('@/types/character').LevelUpChoice) => void;
+  /** False until first persistence load finishes (Supabase) or local snapshot is ready. */
+  persistHydrated: boolean;
 }
 
 /**
- * Manages full game state with localStorage persistence.
+ * Manages full game state with Supabase or localStorage persistence.
  * When character is first set (e.g. after creation), map state is initialized to default.
  */
 export function useGameState({ cols, rows, campaign, placedEncounters = {}, toast }: GameStateHookParams): GameStateHookResult {
   const notify = toast ?? ((msg: string) => { alert(msg); });
-  const [character, setCharacterState] = useState<Character | null>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.character ?? null;
+  const { user, isSupabaseConfigured } = useAuth();
+  const useCloud = Boolean(isSupabaseConfigured && user);
+  const campaignId = campaign.realm.id;
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [initialLoaded] = useState<PersistedGameState | null>(() => {
+    if (isSupabaseConfigured && user) return null;
+    return loadGameStateLocal(cols, rows);
   });
 
   const defaultMap = getDefaultMapState(cols, rows, campaign.realm.startingHex);
-  const [resources, setResources] = useState<CharacterResources>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.character?.resources ?? DEFAULT_RESOURCES;
-  });
-  const [progression, setProgression] = useState<Progression>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.character?.progression ?? DEFAULT_PROGRESSION;
-  });
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.character?.inventory ?? [];
-  });
-  const [playerPos, setPlayerPos] = useState<{ q: number; r: number }>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.mapState?.playerPos ?? defaultMap.playerPos;
-  });
+  const [character, setCharacterState] = useState<Character | null>(() => initialLoaded?.character ?? null);
+
+  const [resources, setResources] = useState<CharacterResources>(
+    () => initialLoaded?.character?.resources ?? DEFAULT_RESOURCES
+  );
+  const [progression, setProgression] = useState<Progression>(
+    () => initialLoaded?.character?.progression ?? DEFAULT_PROGRESSION
+  );
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => initialLoaded?.character?.inventory ?? []);
+  const [playerPos, setPlayerPos] = useState<{ q: number; r: number }>(
+    () => initialLoaded?.mapState?.playerPos ?? defaultMap.playerPos
+  );
   const [revealedHexes, setRevealedHexes] = useState<Set<string>>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.mapState ? new Set(loaded.mapState.revealedHexes) : new Set(defaultMap.revealedHexes);
+    if (!initialLoaded?.mapState) return new Set(defaultMap.revealedHexes);
+    return new Set(initialLoaded.mapState.revealedHexes);
   });
   const [clearedHexes, setClearedHexes] = useState<Set<string>>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.mapState ? new Set(loaded.mapState.clearedHexes) : new Set(defaultMap.clearedHexes);
+    if (!initialLoaded?.mapState) return new Set(defaultMap.clearedHexes);
+    return new Set(initialLoaded.mapState.clearedHexes);
   });
-  const [encounterHealth, setEncounterHealth] = useState<Record<string, number>>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.mapState?.encounterHealth ?? defaultMap.encounterHealth ?? {};
-  });
-  const [anchorUses, setAnchorUses] = useState<Record<string, boolean>>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.mapState?.anchorUses ?? defaultMap.anchorUses ?? {};
-  });
+  const [encounterHealth, setEncounterHealth] = useState<Record<string, number>>(
+    () => initialLoaded?.mapState?.encounterHealth ?? defaultMap.encounterHealth ?? {}
+  );
+  const [anchorUses, setAnchorUses] = useState<Record<string, boolean>>(
+    () => initialLoaded?.mapState?.anchorUses ?? defaultMap.anchorUses ?? {}
+  );
   const [contactedHexes, setContactedHexes] = useState<Set<string>>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.mapState?.contactedHexes ? new Set(loaded.mapState.contactedHexes) : new Set();
+    if (!initialLoaded?.mapState?.contactedHexes) return new Set();
+    return new Set(initialLoaded.mapState.contactedHexes);
   });
   const [justClearedHexId, setJustClearedHexId] = useState<string | null>(null);
-  const [riftProgress, setRiftProgress] = useState<RiftProgress>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.mapState?.riftProgress ?? {};
-  });
-  const [campaignStatus, setCampaignStatus] = useState<CampaignStatus>(() => {
-    const loaded = loadGameState(cols, rows);
-    return (loaded?.mapState as { campaignStatus?: CampaignStatus } | undefined)?.campaignStatus ?? 'active';
-  });
-  const [pendingLevelUp, setPendingLevelUp] = useState<boolean>(() => {
-    const loaded = loadGameState(cols, rows);
-    return (loaded as { pendingLevelUp?: boolean } | null)?.pendingLevelUp ?? false;
-  });
-  const [pendingProgressionAfterLevelUp, setPendingProgressionAfterLevelUp] = useState<Progression | null>(() => {
-    const loaded = loadGameState(cols, rows) as { pendingProgressionAfterLevelUp?: Progression } | null;
-    return loaded?.pendingProgressionAfterLevelUp ?? null;
-  });
+  const [riftProgress, setRiftProgress] = useState<RiftProgress>(
+    () => initialLoaded?.mapState?.riftProgress ?? {}
+  );
+  const [campaignStatus, setCampaignStatus] = useState<CampaignStatus>(
+    () => initialLoaded?.mapState?.campaignStatus ?? 'active'
+  );
+  const [pendingLevelUp, setPendingLevelUp] = useState<boolean>(() => initialLoaded?.pendingLevelUp ?? false);
+  const [pendingProgressionAfterLevelUp, setPendingProgressionAfterLevelUp] = useState<Progression | null>(
+    () => initialLoaded?.pendingProgressionAfterLevelUp ?? null
+  );
+  const [persistHydrated, setPersistHydrated] = useState(() => !useCloud);
+
+  useEffect(() => {
+    if (!useCloud || !user) {
+      setPersistHydrated(true);
+      return;
+    }
+
+    let cancelled = false;
+    setPersistHydrated(false);
+
+    void (async () => {
+      const loaded = await loadPersistedGameStateFromSupabase({
+        userId: user.id,
+        campaignId,
+        cols,
+        rows,
+        startingHex: campaign.realm.startingHex,
+      });
+
+      if (cancelled) return;
+
+      let toApply: PersistedGameState | null = loaded;
+      if (!toApply) {
+        const local = loadGameStateLocal(cols, rows);
+        if (local?.character) {
+          toApply = local;
+          void persistGameStateToSupabase({
+            userId: user.id,
+            campaignId,
+            state: local,
+          });
+        }
+      }
+
+      if (toApply?.character) {
+        const c = toApply.character;
+        const mapState = toApply.mapState;
+        setCharacterState(c);
+        setResources(c.resources);
+        setProgression(c.progression);
+        setInventory(c.inventory ?? []);
+        setPlayerPos(mapState.playerPos);
+        setRevealedHexes(new Set(mapState.revealedHexes));
+        setClearedHexes(new Set(mapState.clearedHexes));
+        setEncounterHealth(mapState.encounterHealth ?? {});
+        setAnchorUses(mapState.anchorUses ?? {});
+        setContactedHexes(new Set(mapState.contactedHexes ?? []));
+        setRiftProgress(mapState.riftProgress ?? {});
+        setCampaignStatus(mapState.campaignStatus ?? 'active');
+        setPendingLevelUp(toApply.pendingLevelUp ?? false);
+        setPendingProgressionAfterLevelUp(toApply.pendingProgressionAfterLevelUp ?? null);
+      }
+
+      setPersistHydrated(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [useCloud, user?.id, campaignId, cols, rows, campaign.realm.startingHex]);
 
   const setCharacter = useCallback(
     (next: Character | null) => {
@@ -223,7 +281,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         return next;
       });
     },
-    [cols, rows]
+    [cols, rows, campaign.realm.startingHex]
   );
 
   const logWorkout = useCallback((type: ActivityType, durationMinutes?: number) => {
@@ -812,10 +870,10 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
     [campaign.rifts, character, resources]
   );
 
-  // Persist to localStorage whenever game state changes (character non-null)
   useEffect(() => {
-    if (!character) return;
-    saveGameState({
+    if (!character || !persistHydrated) return;
+
+    const state: PersistedGameState = {
       character: {
         ...character,
         resources,
@@ -834,8 +892,43 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
       },
       pendingLevelUp: pendingLevelUp || undefined,
       pendingProgressionAfterLevelUp: pendingProgressionAfterLevelUp ?? undefined,
-    });
-  }, [character, resources, progression, inventory, playerPos, revealedHexes, clearedHexes, encounterHealth, anchorUses, contactedHexes, riftProgress, campaignStatus, pendingLevelUp, pendingProgressionAfterLevelUp]);
+    };
+
+    if (useCloud && user) {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        void persistGameStateToSupabase({
+          userId: user.id,
+          campaignId,
+          state,
+        });
+      }, 400);
+      return () => {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      };
+    }
+
+    saveGameStateLocal(state);
+  }, [
+    character,
+    resources,
+    progression,
+    inventory,
+    playerPos,
+    revealedHexes,
+    clearedHexes,
+    encounterHealth,
+    anchorUses,
+    contactedHexes,
+    riftProgress,
+    campaignStatus,
+    pendingLevelUp,
+    pendingProgressionAfterLevelUp,
+    persistHydrated,
+    useCloud,
+    user,
+    campaignId,
+  ]);
 
   return {
     character,
@@ -874,5 +967,6 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
     pendingLevelUp,
     pendingProgressionAfterLevelUp,
     completeLevelUp,
+    persistHydrated,
   };
 }

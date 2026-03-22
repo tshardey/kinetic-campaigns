@@ -70,7 +70,7 @@ export function getDefaultMapState(
 
 const DEFAULT_HP = 5;
 
-function ensureCharacterHp(c: Character): Character {
+export function ensureCharacterHp(c: Character): Character {
   if (typeof c.hp !== 'number' || typeof c.maxHp !== 'number') {
     return { ...c, hp: DEFAULT_HP, maxHp: DEFAULT_HP };
   }
@@ -93,7 +93,7 @@ function parseLegacyCharacter(): Character | null {
  * Load full game state from localStorage.
  * Tries new key first; falls back to legacy character-only key and default map state.
  */
-export function loadGameState(cols: number, rows: number): PersistedGameState | null {
+export function loadGameStateLocal(cols: number, rows: number): PersistedGameState | null {
   try {
     const raw = localStorage.getItem(GAME_STATE_KEY);
     if (raw) {
@@ -133,6 +133,6 @@ export function loadGameState(cols: number, rows: number): PersistedGameState | 
 /**
  * Persist full game state to localStorage.
  */
-export function saveGameState(state: PersistedGameState): void {
+export function saveGameStateLocal(state: PersistedGameState): void {
   localStorage.setItem(GAME_STATE_KEY, JSON.stringify(state));
 }

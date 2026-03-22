@@ -4,7 +4,16 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useGameState } from './useGameState';
-import { saveGameState, getDefaultMapState } from '@/lib/game-state-storage';
+import { saveGameStateLocal, getDefaultMapState } from '@/lib/game-state-storage';
+
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({
+    session: null,
+    user: null,
+    isSessionReady: true,
+    isSupabaseConfigured: false,
+  }),
+}));
 import type { Character } from '@/types/character';
 import type { CampaignPackage, MapEncounter } from '@/types/campaign';
 import { omijaCampaign } from '@/data/omija';
@@ -211,7 +220,7 @@ describe('useGameState', () => {
   it('restores state from localStorage when saved game exists', () => {
     const mapState = getDefaultMapState(COLS, ROWS);
     mapState.clearedHexes.push('2,2');
-    saveGameState({
+    saveGameStateLocal({
       character: { ...validCharacter, progression: { xp: 1, level: 1, currency: 99 } },
       mapState,
     });
@@ -597,7 +606,7 @@ describe('useGameState', () => {
         progression: { xp: 9, level: 1, currency: 0 },
         resources: { slipstream: 5, strikes: 3, wards: 0, aether: 1 },
       };
-      saveGameState({
+      saveGameStateLocal({
         character: characterAtCap,
         mapState: getDefaultMapState(COLS, ROWS),
         pendingLevelUp: true,
@@ -626,7 +635,7 @@ describe('useGameState', () => {
         progression: { xp: 10, level: 1, currency: 0 },
         resources: { slipstream: 5, strikes: 3, wards: 0, aether: 1 },
       };
-      saveGameState({
+      saveGameStateLocal({
         character: woundedAtCap,
         mapState: getDefaultMapState(COLS, ROWS),
         pendingLevelUp: true,
@@ -1184,7 +1193,7 @@ describe('useGameState', () => {
     it('exposes anchorUses and initializes from load', () => {
       const mapState = getDefaultMapState(COLS, ROWS);
       (mapState as { anchorUses?: Record<string, boolean> }).anchorUses = { '3,3': true };
-      saveGameState({ character: validCharacter, mapState });
+      saveGameStateLocal({ character: validCharacter, mapState });
       const { result } = renderHook(() =>
         useGameState({ cols: COLS, rows: ROWS, campaign })
       );

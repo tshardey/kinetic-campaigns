@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { buildCharacter, PLAYBOOKS } from '@/data/playbooks';
-import type { PlaybookId } from '@/types/character';
+import type { Character, PlaybookId } from '@/types/character';
 import { saveCharacter } from '@/lib/character-storage';
 import { NameStep } from './NameStep';
 import { PlaybookStep } from './PlaybookStep';
@@ -9,20 +9,21 @@ import { StartingMoveStep } from './StartingMoveStep';
 export type CreationStep = 'name' | 'playbook' | 'move';
 
 interface CharacterCreationProps {
-  onComplete: () => void;
+  campaignId: string;
+  onComplete: (character: Character) => void;
 }
 
-export function CharacterCreation({ onComplete }: CharacterCreationProps) {
+export function CharacterCreation({ campaignId, onComplete }: CharacterCreationProps) {
   const [step, setStep] = useState<CreationStep>('name');
   const [name, setName] = useState('');
   const [playbookId, setPlaybookId] = useState<PlaybookId | null>(null);
   const [startingMoveId, setStartingMoveId] = useState<string | null>(null);
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     if (!playbookId || !startingMoveId) return;
     const character = buildCharacter(name, playbookId, startingMoveId);
-    saveCharacter(character);
-    onComplete();
+    await saveCharacter(character, campaignId);
+    onComplete(character);
   };
 
   const playbook = playbookId ? PLAYBOOKS.find((p) => p.id === playbookId) : null;

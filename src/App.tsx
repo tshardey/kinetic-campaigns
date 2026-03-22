@@ -8,6 +8,7 @@ import { LevelUpModal } from '@/components/level-up/LevelUpModal';
 import { NexusTent } from '@/components/nexus/NexusTent';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
+import type { UseCampaignResult } from '@/hooks/useCampaign';
 import { useCampaign } from '@/hooks/useCampaign';
 import { useGameState } from '@/hooks/useGameState';
 
@@ -43,23 +44,19 @@ function App() {
   return <AppContent />;
 }
 
-function AppContent() {
-  const { toast } = useToast();
-  const campaignState = useCampaign();
+type ReadyCampaignState = Extract<UseCampaignResult, { isCampaignReady: true }>;
 
-  if (!campaignState.isCampaignReady) {
-    return (
-      <div
-        className="min-h-screen bg-slate-950 text-slate-200 font-sans flex items-center justify-center"
-        role="status"
-        aria-live="polite"
-        aria-busy="true"
-      >
-        <p className="text-slate-400 text-sm">Loading campaign…</p>
-      </div>
-    );
-  }
-
+/**
+ * Mount only after campaign data is ready so hooks like `useGameState` are not skipped
+ * on the loading branch (Rules of Hooks).
+ */
+function AppGameShell({
+  campaignState,
+  toast,
+}: {
+  campaignState: ReadyCampaignState;
+  toast: (message: string, type?: 'info' | 'error') => void;
+}) {
   const { cols, rows, campaign, placedEncounters, placedRifts } = campaignState;
 
   const {
@@ -288,6 +285,26 @@ function AppContent() {
       )}
     </div>
   );
+}
+
+function AppContent() {
+  const { toast } = useToast();
+  const campaignState = useCampaign();
+
+  if (!campaignState.isCampaignReady) {
+    return (
+      <div
+        className="min-h-screen bg-slate-950 text-slate-200 font-sans flex items-center justify-center"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <p className="text-slate-400 text-sm">Loading campaign…</p>
+      </div>
+    );
+  }
+
+  return <AppGameShell campaignState={campaignState} toast={toast} />;
 }
 
 export default App;

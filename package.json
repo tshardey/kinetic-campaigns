@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "supabase": "supabase"
+    "supabase": "supabase",
+    "upload:campaign-assets:local": "supabase storage cp -r public/campaign/omija ss:///campaign-assets/campaign/omija --local --experimental",
+    "upload:campaign-assets:remote": "supabase storage cp -r public/campaign/omija ss:///campaign-assets/campaign/omija --linked --experimental"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.47.0",

@@ -1,1 +1,5 @@
 -- Optional seed data. Campaign rows are typically inserted via the dashboard (service role) or a follow-up seed script.
+--
+-- Image URLs in `campaigns`, `loot_items`, `encounters`, `rifts` should match the public Storage layout, e.g.:
+--   {VITE_SUPABASE_URL}/storage/v1/object/public/campaign-assets/campaign/omija/background/adventure-hero.png
+-- Upload local files: `npm run upload:campaign-assets:local` (after `supabase start`) or `upload:campaign-assets:remote` when linked.

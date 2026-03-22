@@ -149,6 +149,13 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
   const { user, isSupabaseConfigured, isSessionReady } = useAuth();
   const useCloud = Boolean(isSupabaseConfigured && user);
   const campaignId = campaign.realm.id;
+  /** Stable primitives so effects/callbacks do not depend on new `startingHex` object identities each render. */
+  const startingHexQ = campaign.realm.startingHex?.q;
+  const startingHexR = campaign.realm.startingHex?.r;
+  const realmStartingHex =
+    startingHexQ !== undefined && startingHexR !== undefined
+      ? { q: startingHexQ, r: startingHexR }
+      : undefined;
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
@@ -163,7 +170,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
     return loadGameStateLocal(cols, rows);
   });
 
-  const defaultMap = getDefaultMapState(cols, rows, campaign.realm.startingHex);
+  const defaultMap = getDefaultMapState(cols, rows, realmStartingHex);
   const [character, setCharacterState] = useState<Character | null>(() => initialLoaded?.character ?? null);
 
   const [resources, setResources] = useState<CharacterResources>(
@@ -220,7 +227,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
     if (!isSessionReady) {
       return;
     }
-    if (!useCloud || !user) {
+    if (!user) {
       setPersistHydrated(true);
       return;
     }
@@ -234,7 +241,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         campaignId,
         cols,
         rows,
-        startingHex: campaign.realm.startingHex,
+        startingHex: realmStartingHex,
       });
 
       if (cancelled) return;
@@ -280,13 +287,12 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
   }, [
     isSupabaseConfigured,
     isSessionReady,
-    useCloud,
     user,
-    user?.id,
     campaignId,
     cols,
     rows,
-    campaign.realm.startingHex,
+    startingHexQ,
+    startingHexR,
   ]);
 
   const setCharacter = useCallback(
@@ -294,7 +300,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
       setCharacterState((prev) => {
         if (next && !prev) {
           // First time character set (e.g. after creation): init map state to default
-          const def = getDefaultMapState(cols, rows, campaign.realm.startingHex);
+          const def = getDefaultMapState(cols, rows, realmStartingHex);
           setPlayerPos(def.playerPos);
           setRevealedHexes(new Set(def.revealedHexes));
           setClearedHexes(new Set(def.clearedHexes));
@@ -310,7 +316,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         return next;
       });
     },
-    [cols, rows, campaign.realm.startingHex]
+    [cols, rows, startingHexQ, startingHexR]
   );
 
   const logWorkout = useCallback((type: ActivityType, durationMinutes?: number) => {
@@ -372,7 +378,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
           setProgression,
           setInventory,
           getStartPos: () => {
-            const start = campaign.realm.startingHex;
+            const start = realmStartingHex;
             if (start) return start;
             const startHexId = getDefaultStartHexId(cols, rows);
             const [q, r] = startHexId.split(',').map(Number);
@@ -419,7 +425,8 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
       encounterHealth,
       progression.level,
       inventory,
-      campaign.realm.startingHex,
+      startingHexQ,
+      startingHexR,
       cols,
       rows,
     ]
@@ -610,7 +617,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         setProgression,
         setInventory,
         getStartPos: () => {
-          const start = campaign.realm.startingHex;
+          const start = realmStartingHex;
           if (start) return start;
           const startHexId = getDefaultStartHexId(cols, rows);
           const [q, r] = startHexId.split(',').map(Number);
@@ -633,6 +640,8 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
       cols,
       rows,
       notify,
+      startingHexQ,
+      startingHexR,
     ]
   );
 

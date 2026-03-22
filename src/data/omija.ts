@@ -2,8 +2,8 @@
  * Campaign package: The Verdant Expanse of Omija
  * Sourced from realm_packages/Realm Package_ The Verdant Expanse of Omija (1).md
  *
- * Image paths reference public/campaign/omija/. 
- * We prepend BASE_URL so assets work under e.g. /kinetic-campaigns/ in both dev and prod.
+ * Images: see `campaignOmijaAssetUrl` — Storage by default when configured, optional `public/` fallback,
+ * or `VITE_CAMPAIGN_ASSETS_USE_PUBLIC=false` for Storage-only (no images in repo).
  */
 import type {
   CampaignPackage,
@@ -13,9 +13,7 @@ import type {
   NarrativeRiftStage,
   Realm,
 } from '@/types/campaign';
-
-const viteEnv = (import.meta as unknown as { env?: { BASE_URL?: string } }).env;
-const CAMPAIGN_BASE = `${(viteEnv?.BASE_URL ?? '/').replace(/\/+$/, '')}/campaign/omija`;
+import { campaignOmijaAssetUrl as asset } from '@/lib/campaign-asset-url';
 
 const realm: Realm = {
   id: 'omija',
@@ -26,9 +24,9 @@ const realm: Realm = {
   grid_cols: 14,
   grid_rows: 9,
   startingHex: { q: -1, r: 4 },
-  hero_image_url: `${CAMPAIGN_BASE}/background/adventure-hero.png`,
-  map_background_url: `${CAMPAIGN_BASE}/background/map-background.png`,
-  loot_frame_url: `${CAMPAIGN_BASE}/loot/loot-frame.png`,
+  hero_image_url: asset('background/adventure-hero.png'),
+  map_background_url: asset('background/map-background.png'),
+  loot_frame_url: asset('loot/loot-frame.png'),
 };
 
 const encounters: Encounter[] = [
@@ -37,7 +35,7 @@ const encounters: Encounter[] = [
     id: 'mud-eel-scavenger',
     type: 'basic',
     name: 'Mud-Eel Scavenger',
-    image_url: `${CAMPAIGN_BASE}/encounters/basic/mud-eel-scavenger.png`,
+    image_url: asset('encounters/basic/mud-eel-scavenger.png'),
     strikes: 1,
     gold: 10,
     xp: 1,
@@ -46,7 +44,7 @@ const encounters: Encounter[] = [
     id: 'inkrot-puffer',
     type: 'basic',
     name: 'Inkrot Puffer',
-    image_url: `${CAMPAIGN_BASE}/encounters/basic/inkrot-puffer.png`,
+    image_url: asset('encounters/basic/inkrot-puffer.png'),
     strikes: 1,
     gold: 10,
     xp: 1,
@@ -55,7 +53,7 @@ const encounters: Encounter[] = [
     id: 'thief-of-echoes',
     type: 'basic',
     name: 'Thief of Echoes',
-    image_url: `${CAMPAIGN_BASE}/encounters/basic/thief-of-echoes.png`,
+    image_url: asset('encounters/basic/thief-of-echoes.png'),
     strikes: 1,
     gold: 10,
     xp: 1,
@@ -64,7 +62,7 @@ const encounters: Encounter[] = [
     id: 'gale-weed-sprite',
     type: 'basic',
     name: 'Gale-Weed Sprite',
-    image_url: `${CAMPAIGN_BASE}/encounters/basic/gale-weed-sprite.png`,
+    image_url: asset('encounters/basic/gale-weed-sprite.png'),
     strikes: 1,
     gold: 10,
     xp: 1,
@@ -73,7 +71,7 @@ const encounters: Encounter[] = [
     id: 'awakened-automaton',
     type: 'basic',
     name: 'Awakened Automaton',
-    image_url: `${CAMPAIGN_BASE}/encounters/basic/awakened-automaton.png`,
+    image_url: asset('encounters/basic/awakened-automaton.png'),
     strikes: 1,
     gold: 10,
     xp: 1,
@@ -83,7 +81,7 @@ const encounters: Encounter[] = [
     id: 'sovereigns-vanguard',
     type: 'elite',
     name: "The Sovereign's Vanguard",
-    image_url: `${CAMPAIGN_BASE}/encounters/elite/sovereigns-vanguard.png`,
+    image_url: asset('encounters/elite/sovereigns-vanguard.png'),
     strikes: 3,
     gold: 50,
     xp: 2,
@@ -92,14 +90,14 @@ const encounters: Encounter[] = [
       name: 'Vial of Sun-Catch',
       kind: 'consumable',
       description: 'Use: Grants +2 Slipstream.',
-      image_url: `${CAMPAIGN_BASE}/loot/vial-of-sun-catch.png`,
+      image_url: asset('loot/vial-of-sun-catch.png'),
     },
   },
   {
     id: 'master-of-the-crag',
     type: 'elite',
     name: 'Master of the Crag',
-    image_url: `${CAMPAIGN_BASE}/encounters/elite/master-of-the-crag.png`,
+    image_url: asset('encounters/elite/master-of-the-crag.png'),
     strikes: 3,
     gold: 50,
     xp: 2,
@@ -108,14 +106,14 @@ const encounters: Encounter[] = [
       name: 'Iron-Silk Parasol',
       kind: 'consumable',
       description: 'Use: Grants +1 Ward.',
-      image_url: `${CAMPAIGN_BASE}/loot/iron-silk-parasol.png`,
+      image_url: asset('loot/iron-silk-parasol.png'),
     },
   },
   {
     id: 'echo-forgotten-shogun',
     type: 'elite',
     name: 'Echo of the Forgotten Shogun',
-    image_url: `${CAMPAIGN_BASE}/encounters/elite/echo-of-forgotten-shogun.png`,
+    image_url: asset('encounters/elite/echo-of-forgotten-shogun.png'),
     strikes: 3,
     gold: 50,
     xp: 2,
@@ -124,7 +122,7 @@ const encounters: Encounter[] = [
       name: 'Memory Censer',
       kind: 'consumable',
       description: 'Use: Grants +1 Strike.',
-      image_url: `${CAMPAIGN_BASE}/loot/memory-censer.png`,
+      image_url: asset('loot/memory-censer.png'),
     },
   },
   // Realm Boss (Tier 3 – 5 Strikes)
@@ -132,7 +130,7 @@ const encounters: Encounter[] = [
     id: 'obsidian-tempest',
     type: 'boss',
     name: 'The Obsidian Tempest',
-    image_url: `${CAMPAIGN_BASE}/encounters/boss/obsidian-tempest.png`,
+    image_url: asset('encounters/boss/obsidian-tempest.png'),
     strikes: 5,
     gold: 200,
     xp: 4,
@@ -141,7 +139,7 @@ const encounters: Encounter[] = [
       name: 'Talon of the West Wind',
       kind: 'artifact',
       description: 'Permanently buffs Haste.',
-      image_url: `${CAMPAIGN_BASE}/loot/talon-of-the-west-wind.png`,
+      image_url: asset('loot/talon-of-the-west-wind.png'),
     },
   },
 ];
@@ -183,7 +181,7 @@ const riftStages: NarrativeRiftStage[] = [
     costs: [{ resource: 'strikes', amount: 2 }],
     description:
       'You stumble into a hidden glade bathed in unnaturally bright moonlight. The local feline spirits are in distress; the massive stone statue of their First Guardian has been shattered by a trespassing beast, its heavy granite pieces scattered across the grove. You must physically haul the massive stone fragments back to the center of the shrine to rebuild the monument.',
-    image_url: `${CAMPAIGN_BASE}/scenes/shattered-guardian.png`,
+    image_url: asset('scenes/shattered-guardian.png'),
   },
   {
     id: 'shadow-serpent',
@@ -191,7 +189,7 @@ const riftStages: NarrativeRiftStage[] = [
     costs: [{ resource: 'slipstream', amount: 2 }],
     description:
       'As the final piece of the statue slides into place, the Inkrot seeps into the glade, taking the form of a shadowy, multi-headed serpent. It snaps at the moonlight, attempting to devour the spiritual energy before the statue can activate. You must move with perfect agility, rhythmically dodging its lunges and redirecting the moonlight off reflective surfaces to charge the stone Guardian.',
-    image_url: `${CAMPAIGN_BASE}/scenes/shadow-serpent.png`,
+    image_url: asset('scenes/shadow-serpent.png'),
   },
   {
     id: 'lunar-purification',
@@ -203,7 +201,7 @@ const riftStages: NarrativeRiftStage[] = [
     ],
     description:
       'With a deafening chime, the restored statue emits a blinding, purifying flare of lunar energy, instantly incinerating the shadow serpent. The tall grass parts, and dozens of awakened feline spirits emerge, bowing their heads in profound gratitude. They leave a token of their cosmic domain at your feet before vanishing into the shimmering night.',
-    image_url: `${CAMPAIGN_BASE}/scenes/lunar-purification.png`,
+    image_url: asset('scenes/lunar-purification.png'),
   },
 ];
 
@@ -220,7 +218,7 @@ const rifts: NarrativeRift[] = [
       name: 'Moon-Cat Coin',
       kind: 'artifact',
       description: 'A token of the cosmic domain. Permanently buffs Focus.',
-      image_url: `${CAMPAIGN_BASE}/loot/moon-cat-coin.png`,
+      image_url: asset('loot/moon-cat-coin.png'),
     },
   },
 ];

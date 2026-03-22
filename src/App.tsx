@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Map as MapIcon, Tent, PanelLeftClose, PanelLeft, HelpCircle, X } from 'lucide-react';
 import type { NexusReward } from '@/types/campaign';
-import { loadCharacter } from '@/lib/character-storage';
 import { CharacterPanel } from '@/components/sidebar/CharacterPanel';
 import { CharacterCreation } from '@/components/character-creation/CharacterCreation';
 import { HexGrid } from '@/components/hex-grid/HexGrid';
 import { LevelUpModal } from '@/components/level-up/LevelUpModal';
 import { NexusTent } from '@/components/nexus/NexusTent';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
+import type { UseCampaignResult } from '@/hooks/useCampaign';
 import { useCampaign } from '@/hooks/useCampaign';
 import { useGameState } from '@/hooks/useGameState';
+import { AuthBar } from '@/components/auth/AuthBar';
 
 const MOCK_NEXUS_REWARDS: NexusReward[] = [
   { id: 1, title: 'Fancy Bath or Wellness Product', cost: 50, icon: '🛁', desc: 'Lush bath bomb, Epsom salts, or wellness treat (~1/week)' },
@@ -22,14 +24,46 @@ const MOCK_NEXUS_REWARDS: NexusReward[] = [
   { id: 8, title: 'Fitness Retreat', cost: 2500, icon: '🏔️', desc: 'Weekend yoga retreat or wellness vacation (~1/year)' },
 ];
 
+/**
+ * Main shell: waits for Supabase auth bootstrap before mounting hooks that load
+ * user-owned state (campaign/game state will rely on session in follow-up work).
+ */
 function App() {
-  const { toast } = useToast();
-  const campaignState = useCampaign();
+  const { isSessionReady } = useAuth();
+  if (!isSessionReady) {
+    return (
+      <div
+        className="min-h-screen bg-slate-950 text-slate-200 font-sans flex items-center justify-center"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <p className="text-slate-400 text-sm">Loading session…</p>
+      </div>
+    );
+  }
+  return <AppContent />;
+}
+
+type ReadyCampaignState = Extract<UseCampaignResult, { isCampaignReady: true }>;
+
+/**
+ * Mount only after campaign data is ready so hooks like `useGameState` are not skipped
+ * on the loading branch (Rules of Hooks).
+ */
+function AppGameShell({
+  campaignState,
+  toast,
+}: {
+  campaignState: ReadyCampaignState;
+  toast: (message: string, type?: 'info' | 'error') => void;
+}) {
   const { cols, rows, campaign, placedEncounters, placedRifts } = campaignState;
 
   const {
     character,
     setCharacter,
+    persistHydrated,
     resources,
     progression,
     inventory,
@@ -69,8 +103,26 @@ function App() {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
+  if (!persistHydrated) {
+    return (
+      <div
+        className="min-h-screen bg-slate-950 text-slate-200 font-sans flex items-center justify-center"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <p className="text-slate-400 text-sm">Loading save…</p>
+      </div>
+    );
+  }
+
   if (!character) {
-    return <CharacterCreation onComplete={() => setCharacter(loadCharacter())} />;
+    return (
+      <CharacterCreation
+        campaignId={campaign.realm.id}
+        onComplete={(c) => setCharacter(c)}
+      />
+    );
   }
 
   const newLevel = pendingProgressionAfterLevelUp?.level ?? progression.level + 1;
@@ -144,14 +196,17 @@ function App() {
               <Tent className="w-4 h-4 mr-2" /> The Nexus Tent
             </button>
           </nav>
-          <button
-            type="button"
-            onClick={() => setShowHowToPlay(true)}
-            className="ml-auto p-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-800"
-            aria-label="How to play"
-          >
-            <HelpCircle className="w-5 h-5" />
-          </button>
+          <div className="ml-auto flex items-center gap-2 md:gap-3 shrink-0">
+            <AuthBar />
+            <button
+              type="button"
+              onClick={() => setShowHowToPlay(true)}
+              className="p-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-800"
+              aria-label="How to play"
+            >
+              <HelpCircle className="w-5 h-5" />
+            </button>
+          </div>
         </header>
 
         {showHowToPlay && (
@@ -209,7 +264,7 @@ function App() {
               onMove={movePlayer}
               onOpenNexus={() => setActiveTab('nexus')}
               onEngageEncounter={engageEncounter}
-              useDimensionalAnchor={useDimensionalAnchor}
+              applyDimensionalAnchor={useDimensionalAnchor}
               onScoutHex={onScoutHex}
               onAttemptRiftStage={attemptRiftStage}
               onContinueFromVictory={() => setJustClearedHexId(null)}
@@ -234,6 +289,26 @@ function App() {
       )}
     </div>
   );
+}
+
+function AppContent() {
+  const { toast } = useToast();
+  const campaignState = useCampaign();
+
+  if (!campaignState.isCampaignReady) {
+    return (
+      <div
+        className="min-h-screen bg-slate-950 text-slate-200 font-sans flex items-center justify-center"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <p className="text-slate-400 text-sm">Loading campaign…</p>
+      </div>
+    );
+  }
+
+  return <AppGameShell campaignState={campaignState} toast={toast} />;
 }
 
 export default App;

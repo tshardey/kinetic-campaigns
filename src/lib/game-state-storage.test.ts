@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  loadGameState,
-  saveGameState,
+  loadGameStateLocal,
+  saveGameStateLocal,
   getDefaultMapState,
+  clearOfflineLegacyPersistence,
   type PersistedGameState,
   type MapState,
 } from './game-state-storage';
-import { saveCharacter } from './character-storage';
+import { saveCharacterLocal } from './character-storage';
 import type { Character } from '@/types/character';
 import { getDefaultStartHexId } from '@/engine/encounter-placement';
 
@@ -97,9 +98,9 @@ describe('game-state-storage', () => {
     });
   });
 
-  describe('saveGameState / loadGameState', () => {
+  describe('saveGameStateLocal / loadGameStateLocal', () => {
     it('returns null when nothing stored', () => {
-      expect(loadGameState(COLS, ROWS)).toBeNull();
+      expect(loadGameStateLocal(COLS, ROWS)).toBeNull();
     });
 
     it('persists and restores full game state', () => {
@@ -112,8 +113,8 @@ describe('game-state-storage', () => {
         character: { ...validCharacter, inventory: [] },
         mapState,
       };
-      saveGameState(state);
-      const loaded = loadGameState(COLS, ROWS);
+      saveGameStateLocal(state);
+      const loaded = loadGameStateLocal(COLS, ROWS);
       expect(loaded).not.toBeNull();
       expect(loaded!.character.name).toBe(validCharacter.name);
       expect(loaded!.character.resources).toEqual(validCharacter.resources);
@@ -124,7 +125,7 @@ describe('game-state-storage', () => {
 
     it('returns null when stored data is invalid JSON', () => {
       mockStorage.setItem('kinetic-campaigns-game-state', 'not json');
-      expect(loadGameState(COLS, ROWS)).toBeNull();
+      expect(loadGameStateLocal(COLS, ROWS)).toBeNull();
     });
 
     it('returns null when game state has invalid character (missing name)', () => {
@@ -132,8 +133,8 @@ describe('game-state-storage', () => {
         character: { ...validCharacter, name: '' },
         mapState: getDefaultMapState(COLS, ROWS),
       };
-      saveGameState(state);
-      expect(loadGameState(COLS, ROWS)).toBeNull();
+      saveGameStateLocal(state);
+      expect(loadGameStateLocal(COLS, ROWS)).toBeNull();
     });
 
     it('round-trip preserves character and map state', () => {
@@ -143,8 +144,8 @@ describe('game-state-storage', () => {
         character: { ...validCharacter, progression: { xp: 2, level: 1, currency: 200 } },
         mapState,
       };
-      saveGameState(state);
-      const loaded = loadGameState(COLS, ROWS);
+      saveGameStateLocal(state);
+      const loaded = loadGameStateLocal(COLS, ROWS);
       expect(loaded!.character.progression.currency).toBe(200);
       expect(loaded!.mapState.clearedHexes).toContain('2,3');
     });
@@ -158,8 +159,8 @@ describe('game-state-storage', () => {
         character: validCharacter,
         mapState,
       };
-      saveGameState(state);
-      const loaded = loadGameState(COLS, ROWS);
+      saveGameStateLocal(state);
+      const loaded = loadGameStateLocal(COLS, ROWS);
       expect(loaded!.mapState.encounterHealth).toEqual({ '3,4': 2, '5,6': 1 });
     });
 
@@ -172,16 +173,16 @@ describe('game-state-storage', () => {
         character: validCharacter,
         mapState,
       };
-      saveGameState(state);
-      const loaded = loadGameState(COLS, ROWS);
+      saveGameStateLocal(state);
+      const loaded = loadGameStateLocal(COLS, ROWS);
       expect(loaded!.mapState.contactedHexes).toEqual(['1,2', '3,4']);
     });
   });
 
   describe('loadGameState legacy migration', () => {
     it('migrates from legacy character-only key and uses default map state', () => {
-      saveCharacter(validCharacter);
-      const loaded = loadGameState(COLS, ROWS);
+      saveCharacterLocal(validCharacter);
+      const loaded = loadGameStateLocal(COLS, ROWS);
       expect(loaded).not.toBeNull();
       expect(loaded!.character.name).toBe(validCharacter.name);
       expect(loaded!.character.playbook).toBe(validCharacter.playbook);
@@ -191,13 +192,13 @@ describe('game-state-storage', () => {
     });
 
     it('prefers new game-state key over legacy when both exist', () => {
-      saveCharacter(validCharacter);
+      saveCharacterLocal(validCharacter);
       const customState: PersistedGameState = {
         character: { ...validCharacter, name: 'FromNewKey' },
         mapState: { playerPos: { q: 5, r: 5 }, revealedHexes: ['5,5'], clearedHexes: [] },
       };
-      saveGameState(customState);
-      const loaded = loadGameState(COLS, ROWS);
+      saveGameStateLocal(customState);
+      const loaded = loadGameStateLocal(COLS, ROWS);
       expect(loaded!.character.name).toBe('FromNewKey');
       expect(loaded!.mapState.playerPos).toEqual({ q: 5, r: 5 });
     });
@@ -210,8 +211,8 @@ describe('game-state-storage', () => {
         pendingLevelUp: true,
         pendingProgressionAfterLevelUp: { xp: 3, level: 2, currency: 100 },
       };
-      saveGameState(state);
-      const loaded = loadGameState(COLS, ROWS);
+      saveGameStateLocal(state);
+      const loaded = loadGameStateLocal(COLS, ROWS);
       expect(loaded).not.toBeNull();
       expect(loaded!.pendingLevelUp).toBe(true);
       expect(loaded!.pendingProgressionAfterLevelUp).toEqual({
@@ -219,6 +220,22 @@ describe('game-state-storage', () => {
         level: 2,
         currency: 100,
       });
+    });
+  });
+
+  describe('clearOfflineLegacyPersistence', () => {
+    it('removes game state and legacy character keys', () => {
+      saveGameStateLocal({
+        character: validCharacter,
+        mapState: getDefaultMapState(COLS, ROWS),
+      });
+      saveCharacterLocal(validCharacter);
+      expect(mockStorage.getItem('kinetic-campaigns-game-state')).not.toBeNull();
+      expect(mockStorage.getItem('kinetic-campaigns-character')).not.toBeNull();
+      clearOfflineLegacyPersistence();
+      expect(mockStorage.getItem('kinetic-campaigns-game-state')).toBeNull();
+      expect(mockStorage.getItem('kinetic-campaigns-character')).toBeNull();
+      expect(loadGameStateLocal(COLS, ROWS)).toBeNull();
     });
   });
 });

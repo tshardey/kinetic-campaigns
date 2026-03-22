@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { loadCharacter, saveCharacter } from './character-storage';
 import type { Character } from '@/types/character';
 
+const CAMPAIGN_ID = 'omija';
+
 const validCharacter: Character = {
   name: 'Test',
   playbook: 'gate-crasher',
@@ -46,8 +48,8 @@ describe('character-storage', () => {
   });
 
   describe('saveCharacter', () => {
-    it('persists character as JSON', () => {
-      saveCharacter(validCharacter);
+    it('persists character as JSON', async () => {
+      await saveCharacter(validCharacter, CAMPAIGN_ID);
       const raw = mockStorage.getItem('kinetic-campaigns-character');
       expect(raw).not.toBeNull();
       const parsed = JSON.parse(raw!) as Character;
@@ -58,13 +60,13 @@ describe('character-storage', () => {
   });
 
   describe('loadCharacter', () => {
-    it('returns null when nothing stored', () => {
-      expect(loadCharacter()).toBeNull();
+    it('returns null when nothing stored', async () => {
+      await expect(loadCharacter(CAMPAIGN_ID)).resolves.toBeNull();
     });
 
-    it('returns character after saveCharacter', () => {
-      saveCharacter(validCharacter);
-      const loaded = loadCharacter();
+    it('returns character after saveCharacter', async () => {
+      await saveCharacter(validCharacter, CAMPAIGN_ID);
+      const loaded = await loadCharacter(CAMPAIGN_ID);
       expect(loaded).not.toBeNull();
       expect(loaded!.name).toBe(validCharacter.name);
       expect(loaded!.playbook).toBe(validCharacter.playbook);
@@ -74,45 +76,45 @@ describe('character-storage', () => {
       expect(loaded!.progression).toEqual(validCharacter.progression);
     });
 
-    it('returns null when stored data is invalid JSON', () => {
+    it('returns null when stored data is invalid JSON', async () => {
       mockStorage.setItem('kinetic-campaigns-character', 'not json');
-      expect(loadCharacter()).toBeNull();
+      await expect(loadCharacter(CAMPAIGN_ID)).resolves.toBeNull();
     });
 
-    it('returns null when stored object missing name', () => {
+    it('returns null when stored object missing name', async () => {
       const bad = { ...validCharacter, name: '' };
       mockStorage.setItem('kinetic-campaigns-character', JSON.stringify(bad));
-      expect(loadCharacter()).toBeNull();
+      await expect(loadCharacter(CAMPAIGN_ID)).resolves.toBeNull();
     });
 
-    it('returns null when stored object missing playbook', () => {
+    it('returns null when stored object missing playbook', async () => {
       const bad = { ...validCharacter, playbook: undefined };
       mockStorage.setItem('kinetic-campaigns-character', JSON.stringify(bad));
-      expect(loadCharacter()).toBeNull();
+      await expect(loadCharacter(CAMPAIGN_ID)).resolves.toBeNull();
     });
 
-    it('returns null when stored object missing stats', () => {
+    it('returns null when stored object missing stats', async () => {
       const bad = { ...validCharacter, stats: undefined };
       mockStorage.setItem('kinetic-campaigns-character', JSON.stringify(bad));
-      expect(loadCharacter()).toBeNull();
+      await expect(loadCharacter(CAMPAIGN_ID)).resolves.toBeNull();
     });
 
-    it('returns null when stored object missing startingMoveId', () => {
+    it('returns null when stored object missing startingMoveId', async () => {
       const bad = { ...validCharacter, startingMoveId: undefined };
       mockStorage.setItem('kinetic-campaigns-character', JSON.stringify(bad));
-      expect(loadCharacter()).toBeNull();
+      await expect(loadCharacter(CAMPAIGN_ID)).resolves.toBeNull();
     });
 
-    it('returns null when JSON.parse throws', () => {
+    it('returns null when JSON.parse throws', async () => {
       mockStorage.setItem('kinetic-campaigns-character', '{{{');
-      expect(loadCharacter()).toBeNull();
+      await expect(loadCharacter(CAMPAIGN_ID)).resolves.toBeNull();
     });
   });
 
   describe('round-trip', () => {
-    it('save then load preserves character', () => {
-      saveCharacter(validCharacter);
-      const loaded = loadCharacter();
+    it('save then load preserves character', async () => {
+      await saveCharacter(validCharacter, CAMPAIGN_ID);
+      const loaded = await loadCharacter(CAMPAIGN_ID);
       expect(loaded).toEqual(validCharacter);
     });
   });

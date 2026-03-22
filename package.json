@@ -9,7 +9,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "supabase": "supabase",
+    "upload:campaign-assets:local": "supabase storage cp -r public/campaign/omija ss:///campaign-assets/campaign/omija --local --experimental",
+    "upload:campaign-assets:remote": "supabase storage cp -r public/campaign/omija ss:///campaign-assets/campaign/omija --linked --experimental"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.47.0",
@@ -30,6 +33,7 @@
     "eslint-plugin-react-refresh": "^0.4.14",
     "globals": "^15.12.0",
     "jsdom": "^28.1.0",
+    "supabase": "^2.83.0",
     "tailwindcss": "^4.0.0",
     "typescript": "~5.6.2",
     "typescript-eslint": "^8.15.0",

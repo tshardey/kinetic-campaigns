@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { buildCharacter, PLAYBOOKS } from '@/data/playbooks';
-import type { PlaybookId } from '@/types/character';
+import type { Character, PlaybookId } from '@/types/character';
 import { saveCharacter } from '@/lib/character-storage';
+import { AuthBar } from '@/components/auth/AuthBar';
 import { NameStep } from './NameStep';
 import { PlaybookStep } from './PlaybookStep';
 import { StartingMoveStep } from './StartingMoveStep';
@@ -9,26 +10,30 @@ import { StartingMoveStep } from './StartingMoveStep';
 export type CreationStep = 'name' | 'playbook' | 'move';
 
 interface CharacterCreationProps {
-  onComplete: () => void;
+  campaignId: string;
+  onComplete: (character: Character) => void;
 }
 
-export function CharacterCreation({ onComplete }: CharacterCreationProps) {
+export function CharacterCreation({ campaignId, onComplete }: CharacterCreationProps) {
   const [step, setStep] = useState<CreationStep>('name');
   const [name, setName] = useState('');
   const [playbookId, setPlaybookId] = useState<PlaybookId | null>(null);
   const [startingMoveId, setStartingMoveId] = useState<string | null>(null);
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     if (!playbookId || !startingMoveId) return;
     const character = buildCharacter(name, playbookId, startingMoveId);
-    saveCharacter(character);
-    onComplete();
+    await saveCharacter(character, campaignId);
+    onComplete(character);
   };
 
   const playbook = playbookId ? PLAYBOOKS.find((p) => p.id === playbookId) : null;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex items-center justify-center p-6">
+    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex items-center justify-center p-6 relative">
+      <div className="absolute top-4 right-4 z-10">
+        <AuthBar />
+      </div>
       <div className="w-full max-w-2xl">
         <header className="text-center mb-10">
           <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-blue-500">

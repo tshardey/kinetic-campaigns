@@ -1,9 +1,12 @@
 /**
  * Manages character, resources, progression, map state, and inventory.
- * Reads from and auto-saves to localStorage on every change.
+ * Persists to Supabase when signed in and configured; otherwise localStorage.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { persistGameStateToSupabase } from '@/lib/persist-game-state';
+import { resolvePersistedGameStateForSignedInUser } from '@/lib/legacy-local-to-supabase-migration';
 import type { Character, CharacterResources, Progression, InventoryItem, LevelUpChoice } from '@/types/character';
 import type { ActivityType } from '@/types/character';
 import type { MapEncounter, NexusReward } from '@/types/campaign';
@@ -15,7 +18,7 @@ import { getAdjacentHexIds, getHexIdsAtDistance } from '@/engine/hex-math';
 import { getDefaultStartHexId } from '@/engine/encounter-placement';
 import { applyArtifactOnAcquisition, getConsumableEffect, lootDropToInventoryItem } from '@/engine/inventory';
 import { canAffordRiftStage, spendForRiftStage } from '@/engine/rift';
-import { loadGameState, saveGameState, getDefaultMapState } from '@/lib/game-state-storage';
+import { loadGameStateLocal, saveGameStateLocal, getDefaultMapState, type PersistedGameState } from '@/lib/game-state-storage';
 import { rollEnemyHp } from '@/engine/enemy-scaling';
 import { getCharacterMoveIds, hasCharacterMove } from '@/lib/character-moves';
 
@@ -134,80 +137,166 @@ export interface GameStateHookResult {
   /** Progression to apply after level-up choice. */
   pendingProgressionAfterLevelUp: Progression | null;
   completeLevelUp: (choice: import('@/types/character').LevelUpChoice) => void;
+  /** False until first persistence load finishes (Supabase) or local snapshot is ready. */
+  persistHydrated: boolean;
 }
 
 /**
- * Manages full game state with localStorage persistence.
+ * Manages full game state with Supabase or localStorage persistence.
  * When character is first set (e.g. after creation), map state is initialized to default.
  */
 export function useGameState({ cols, rows, campaign, placedEncounters = {}, toast }: GameStateHookParams): GameStateHookResult {
   const notify = toast ?? ((msg: string) => { alert(msg); });
-  const [character, setCharacterState] = useState<Character | null>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.character ?? null;
+  const { user, isSupabaseConfigured, isSessionReady } = useAuth();
+  const useCloud = Boolean(isSupabaseConfigured && user);
+  const campaignId = campaign.realm.id;
+  /** Stable primitives so effects/callbacks do not depend on new `startingHex` object identities each render. */
+  const startingHexQ = campaign.realm.startingHex?.q;
+  const startingHexR = campaign.realm.startingHex?.r;
+  const realmStartingHex =
+    startingHexQ !== undefined && startingHexR !== undefined
+      ? { q: startingHexQ, r: startingHexR }
+      : undefined;
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /**
+   * Always seed from localStorage when present so the first hook paint matches the browser
+   * save (including after sign-in remounts / session restore where `user` is already set).
+   * The signed-in hydration effect below replaces this with cloud + migration results.
+   */
+  const [initialLoaded] = useState<PersistedGameState | null>(() => {
+    if (!isSupabaseConfigured) return loadGameStateLocal(cols, rows);
+    return loadGameStateLocal(cols, rows);
   });
 
-  const defaultMap = getDefaultMapState(cols, rows, campaign.realm.startingHex);
-  const [resources, setResources] = useState<CharacterResources>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.character?.resources ?? DEFAULT_RESOURCES;
-  });
-  const [progression, setProgression] = useState<Progression>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.character?.progression ?? DEFAULT_PROGRESSION;
-  });
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.character?.inventory ?? [];
-  });
-  const [playerPos, setPlayerPos] = useState<{ q: number; r: number }>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.mapState?.playerPos ?? defaultMap.playerPos;
-  });
+  const defaultMap = getDefaultMapState(cols, rows, realmStartingHex);
+  const [character, setCharacterState] = useState<Character | null>(() => initialLoaded?.character ?? null);
+
+  const [resources, setResources] = useState<CharacterResources>(
+    () => initialLoaded?.character?.resources ?? DEFAULT_RESOURCES
+  );
+  const [progression, setProgression] = useState<Progression>(
+    () => initialLoaded?.character?.progression ?? DEFAULT_PROGRESSION
+  );
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => initialLoaded?.character?.inventory ?? []);
+  const [playerPos, setPlayerPos] = useState<{ q: number; r: number }>(
+    () => initialLoaded?.mapState?.playerPos ?? defaultMap.playerPos
+  );
   const [revealedHexes, setRevealedHexes] = useState<Set<string>>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.mapState ? new Set(loaded.mapState.revealedHexes) : new Set(defaultMap.revealedHexes);
+    if (!initialLoaded?.mapState) return new Set(defaultMap.revealedHexes);
+    return new Set(initialLoaded.mapState.revealedHexes);
   });
   const [clearedHexes, setClearedHexes] = useState<Set<string>>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.mapState ? new Set(loaded.mapState.clearedHexes) : new Set(defaultMap.clearedHexes);
+    if (!initialLoaded?.mapState) return new Set(defaultMap.clearedHexes);
+    return new Set(initialLoaded.mapState.clearedHexes);
   });
-  const [encounterHealth, setEncounterHealth] = useState<Record<string, number>>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.mapState?.encounterHealth ?? defaultMap.encounterHealth ?? {};
-  });
-  const [anchorUses, setAnchorUses] = useState<Record<string, boolean>>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.mapState?.anchorUses ?? defaultMap.anchorUses ?? {};
-  });
+  const [encounterHealth, setEncounterHealth] = useState<Record<string, number>>(
+    () => initialLoaded?.mapState?.encounterHealth ?? defaultMap.encounterHealth ?? {}
+  );
+  const [anchorUses, setAnchorUses] = useState<Record<string, boolean>>(
+    () => initialLoaded?.mapState?.anchorUses ?? defaultMap.anchorUses ?? {}
+  );
   const [contactedHexes, setContactedHexes] = useState<Set<string>>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.mapState?.contactedHexes ? new Set(loaded.mapState.contactedHexes) : new Set();
+    if (!initialLoaded?.mapState?.contactedHexes) return new Set();
+    return new Set(initialLoaded.mapState.contactedHexes);
   });
   const [justClearedHexId, setJustClearedHexId] = useState<string | null>(null);
-  const [riftProgress, setRiftProgress] = useState<RiftProgress>(() => {
-    const loaded = loadGameState(cols, rows);
-    return loaded?.mapState?.riftProgress ?? {};
+  const [riftProgress, setRiftProgress] = useState<RiftProgress>(
+    () => initialLoaded?.mapState?.riftProgress ?? {}
+  );
+  const [campaignStatus, setCampaignStatus] = useState<CampaignStatus>(
+    () => initialLoaded?.mapState?.campaignStatus ?? 'active'
+  );
+  const [pendingLevelUp, setPendingLevelUp] = useState<boolean>(() => initialLoaded?.pendingLevelUp ?? false);
+  const [pendingProgressionAfterLevelUp, setPendingProgressionAfterLevelUp] = useState<Progression | null>(
+    () => initialLoaded?.pendingProgressionAfterLevelUp ?? null
+  );
+  const [persistHydrated, setPersistHydrated] = useState(() => {
+    if (!isSupabaseConfigured) return true;
+    if (!isSessionReady) return false;
+    if (user) return false;
+    return true;
   });
-  const [campaignStatus, setCampaignStatus] = useState<CampaignStatus>(() => {
-    const loaded = loadGameState(cols, rows);
-    return (loaded?.mapState as { campaignStatus?: CampaignStatus } | undefined)?.campaignStatus ?? 'active';
-  });
-  const [pendingLevelUp, setPendingLevelUp] = useState<boolean>(() => {
-    const loaded = loadGameState(cols, rows);
-    return (loaded as { pendingLevelUp?: boolean } | null)?.pendingLevelUp ?? false;
-  });
-  const [pendingProgressionAfterLevelUp, setPendingProgressionAfterLevelUp] = useState<Progression | null>(() => {
-    const loaded = loadGameState(cols, rows) as { pendingProgressionAfterLevelUp?: Progression } | null;
-    return loaded?.pendingProgressionAfterLevelUp ?? null;
-  });
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setPersistHydrated(true);
+      return;
+    }
+    if (!isSessionReady) {
+      return;
+    }
+    if (!user) {
+      setPersistHydrated(true);
+      return;
+    }
+
+    let cancelled = false;
+    setPersistHydrated(false);
+
+    void (async () => {
+      const loaded = await resolvePersistedGameStateForSignedInUser({
+        userId: user.id,
+        campaignId,
+        cols,
+        rows,
+        startingHex: realmStartingHex,
+      });
+
+      if (cancelled) return;
+
+      let toApply: PersistedGameState | null = loaded;
+
+      if (!toApply?.character) {
+        const fallback = loadGameStateLocal(cols, rows);
+        if (fallback?.character) {
+          toApply = fallback;
+          void persistGameStateToSupabase({ userId: user.id, campaignId, state: fallback });
+        }
+      }
+
+      if (toApply?.character) {
+        const c = toApply.character;
+        const mapState = toApply.mapState;
+        setCharacterState(c);
+        setResources(c.resources);
+        setProgression(c.progression);
+        setInventory(c.inventory ?? []);
+        setPlayerPos(mapState.playerPos);
+        setRevealedHexes(new Set(mapState.revealedHexes));
+        setClearedHexes(new Set(mapState.clearedHexes));
+        setEncounterHealth(mapState.encounterHealth ?? {});
+        setAnchorUses(mapState.anchorUses ?? {});
+        setContactedHexes(new Set(mapState.contactedHexes ?? []));
+        setRiftProgress(mapState.riftProgress ?? {});
+        setCampaignStatus(mapState.campaignStatus ?? 'active');
+        setPendingLevelUp(toApply.pendingLevelUp ?? false);
+        setPendingProgressionAfterLevelUp(toApply.pendingProgressionAfterLevelUp ?? null);
+      }
+
+      setPersistHydrated(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isSupabaseConfigured,
+    isSessionReady,
+    user,
+    campaignId,
+    cols,
+    rows,
+    startingHexQ,
+    startingHexR,
+  ]);
 
   const setCharacter = useCallback(
     (next: Character | null) => {
       setCharacterState((prev) => {
         if (next && !prev) {
           // First time character set (e.g. after creation): init map state to default
-          const def = getDefaultMapState(cols, rows, campaign.realm.startingHex);
+          const def = getDefaultMapState(cols, rows, realmStartingHex);
           setPlayerPos(def.playerPos);
           setRevealedHexes(new Set(def.revealedHexes));
           setClearedHexes(new Set(def.clearedHexes));
@@ -223,7 +312,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         return next;
       });
     },
-    [cols, rows]
+    [cols, rows, startingHexQ, startingHexR]
   );
 
   const logWorkout = useCallback((type: ActivityType, durationMinutes?: number) => {
@@ -285,7 +374,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
           setProgression,
           setInventory,
           getStartPos: () => {
-            const start = campaign.realm.startingHex;
+            const start = realmStartingHex;
             if (start) return start;
             const startHexId = getDefaultStartHexId(cols, rows);
             const [q, r] = startHexId.split(',').map(Number);
@@ -332,7 +421,8 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
       encounterHealth,
       progression.level,
       inventory,
-      campaign.realm.startingHex,
+      startingHexQ,
+      startingHexR,
       cols,
       rows,
     ]
@@ -523,7 +613,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
         setProgression,
         setInventory,
         getStartPos: () => {
-          const start = campaign.realm.startingHex;
+          const start = realmStartingHex;
           if (start) return start;
           const startHexId = getDefaultStartHexId(cols, rows);
           const [q, r] = startHexId.split(',').map(Number);
@@ -546,6 +636,8 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
       cols,
       rows,
       notify,
+      startingHexQ,
+      startingHexR,
     ]
   );
 
@@ -812,10 +904,10 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
     [campaign.rifts, character, resources]
   );
 
-  // Persist to localStorage whenever game state changes (character non-null)
   useEffect(() => {
-    if (!character) return;
-    saveGameState({
+    if (!character || !persistHydrated) return;
+
+    const state: PersistedGameState = {
       character: {
         ...character,
         resources,
@@ -834,8 +926,49 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
       },
       pendingLevelUp: pendingLevelUp || undefined,
       pendingProgressionAfterLevelUp: pendingProgressionAfterLevelUp ?? undefined,
-    });
-  }, [character, resources, progression, inventory, playerPos, revealedHexes, clearedHexes, encounterHealth, anchorUses, contactedHexes, riftProgress, campaignStatus, pendingLevelUp, pendingProgressionAfterLevelUp]);
+    };
+
+    if (useCloud && user) {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        void persistGameStateToSupabase({
+          userId: user.id,
+          campaignId,
+          state,
+        });
+      }, 400);
+    } else {
+      saveGameStateLocal(state);
+    }
+
+    // Always clear the debounced cloud save on dep change or unmount, including when
+    // switching from cloud to local or when auth drops — not only when the last run used cloud.
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
+  }, [
+    character,
+    resources,
+    progression,
+    inventory,
+    playerPos,
+    revealedHexes,
+    clearedHexes,
+    encounterHealth,
+    anchorUses,
+    contactedHexes,
+    riftProgress,
+    campaignStatus,
+    pendingLevelUp,
+    pendingProgressionAfterLevelUp,
+    persistHydrated,
+    useCloud,
+    user,
+    campaignId,
+  ]);
 
   return {
     character,
@@ -874,5 +1007,6 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
     pendingLevelUp,
     pendingProgressionAfterLevelUp,
     completeLevelUp,
+    persistHydrated,
   };
 }

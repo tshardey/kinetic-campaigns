@@ -146,13 +146,20 @@ export interface GameStateHookResult {
  */
 export function useGameState({ cols, rows, campaign, placedEncounters = {}, toast }: GameStateHookParams): GameStateHookResult {
   const notify = toast ?? ((msg: string) => { alert(msg); });
-  const { user, isSupabaseConfigured } = useAuth();
+  const { user, isSupabaseConfigured, isSessionReady } = useAuth();
   const useCloud = Boolean(isSupabaseConfigured && user);
   const campaignId = campaign.realm.id;
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /**
+   * Local snapshot for offline / signed-out only. When Supabase is configured and a user is
+   * signed in, defer to `loadPersistedGameStateFromSupabase` in the effect below — do not
+   * seed from localStorage in the initializer (AppContent mounts after `isSessionReady`, so
+   * `user` reflects the resolved session on first paint).
+   */
   const [initialLoaded] = useState<PersistedGameState | null>(() => {
-    if (isSupabaseConfigured && user) return null;
+    if (!isSupabaseConfigured) return loadGameStateLocal(cols, rows);
+    if (user) return null;
     return loadGameStateLocal(cols, rows);
   });
 
@@ -198,9 +205,21 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
   const [pendingProgressionAfterLevelUp, setPendingProgressionAfterLevelUp] = useState<Progression | null>(
     () => initialLoaded?.pendingProgressionAfterLevelUp ?? null
   );
-  const [persistHydrated, setPersistHydrated] = useState(() => !useCloud);
+  const [persistHydrated, setPersistHydrated] = useState(() => {
+    if (!isSupabaseConfigured) return true;
+    if (!isSessionReady) return false;
+    if (user) return false;
+    return true;
+  });
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setPersistHydrated(true);
+      return;
+    }
+    if (!isSessionReady) {
+      return;
+    }
     if (!useCloud || !user) {
       setPersistHydrated(true);
       return;
@@ -258,7 +277,17 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
     return () => {
       cancelled = true;
     };
-  }, [useCloud, user?.id, campaignId, cols, rows, campaign.realm.startingHex]);
+  }, [
+    isSupabaseConfigured,
+    isSessionReady,
+    useCloud,
+    user,
+    user?.id,
+    campaignId,
+    cols,
+    rows,
+    campaign.realm.startingHex,
+  ]);
 
   const setCharacter = useCallback(
     (next: Character | null) => {

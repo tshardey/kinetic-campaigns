@@ -8,12 +8,7 @@ import {
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-
-function isSupabaseConfigured(): boolean {
-  const url = import.meta.env.VITE_SUPABASE_URL ?? '';
-  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? '';
-  return Boolean(url && key);
-}
+import { isSupabaseConfigured as readSupabaseConfiguredFromEnv } from '@/lib/supabase-config';
 
 export interface AuthContextValue {
   session: Session | null;
@@ -29,7 +24,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isSessionReady, setIsSessionReady] = useState(false);
-  const configured = useMemo(() => isSupabaseConfigured(), []);
+  const configured = useMemo(() => readSupabaseConfiguredFromEnv(), []);
 
   useEffect(() => {
     if (!configured) {

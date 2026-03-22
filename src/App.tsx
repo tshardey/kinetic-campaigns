@@ -46,6 +46,20 @@ function App() {
 function AppContent() {
   const { toast } = useToast();
   const campaignState = useCampaign();
+
+  if (!campaignState.isCampaignReady) {
+    return (
+      <div
+        className="min-h-screen bg-slate-950 text-slate-200 font-sans flex items-center justify-center"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <p className="text-slate-400 text-sm">Loading campaign…</p>
+      </div>
+    );
+  }
+
   const { cols, rows, campaign, placedEncounters, placedRifts } = campaignState;
 
   const {

@@ -1,14 +1,16 @@
 /**
  * Loads the active campaign package and provides stable encounter placement.
  * Map layout is deterministic per seed (stable per save).
+ * When Supabase is configured, loads published campaign data; otherwise falls back to bundled Omija.
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import type { CampaignPackage } from '@/types/campaign';
 import type { HexCell } from '@/types/hex';
 import type { MapEncounter } from '@/types/campaign';
 import { generateRectGrid } from '@/engine/hex-math';
 import { placeEncounters, placeRifts, getDefaultStartHexId } from '@/engine/encounter-placement';
+import { loadActiveCampaign } from '@/lib/campaign-loader';
 import { omijaCampaign } from '@/data/omija';
 
 const PLACEMENT_SEED = 42;
@@ -25,13 +27,38 @@ export interface CampaignState {
   placementSeed: number;
 }
 
+/** While `isCampaignReady` is false, only `isCampaignReady` is present (Supabase load in progress). */
+export type UseCampaignResult =
+  | { isCampaignReady: false }
+  | ({ isCampaignReady: true } & CampaignState);
+
 /**
  * Returns the active campaign package with grid and seeded encounter placement.
- * For now uses Omija; later can load from Supabase via loadActiveCampaign().
+ * Loads from Supabase when `VITE_SUPABASE_URL` is set; otherwise uses bundled Omija after first paint.
  */
-export function useCampaign(): CampaignState {
-  return useMemo(() => {
-    const campaign = omijaCampaign;
+export function useCampaign(): UseCampaignResult {
+  const [campaign, setCampaign] = useState<CampaignPackage | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadActiveCampaign()
+      .then((pkg) => {
+        if (cancelled) return;
+        setCampaign(pkg ?? omijaCampaign);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCampaign(omijaCampaign);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return useMemo((): UseCampaignResult => {
+    if (!campaign) {
+      return { isCampaignReady: false };
+    }
     const cols = campaign.realm.grid_cols ?? 14;
     const rows = campaign.realm.grid_rows ?? 9;
     const grid = generateRectGrid(cols, rows);
@@ -54,6 +81,7 @@ export function useCampaign(): CampaignState {
       campaign
     );
     return {
+      isCampaignReady: true,
       campaign,
       grid,
       placedEncounters,
@@ -63,5 +91,5 @@ export function useCampaign(): CampaignState {
       rows,
       placementSeed: PLACEMENT_SEED,
     };
-  }, []);
+  }, [campaign]);
 }

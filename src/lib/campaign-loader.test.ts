@@ -97,4 +97,47 @@ describe('campaignRowsToCampaignPackage', () => {
     expect(pkg.rifts[0].completion_loot?.id).toBe('loot-1');
     expect(pkg.anomalies[0].lore_text).toBe('Lore');
   });
+
+  it('preserves whitespace-only image URLs on optional fields the same as realm URL fields', () => {
+    const ws = '   ';
+    const campaignWs: CampaignRow = { ...campaign, hero_image_url: ws };
+    const lootWs: LootItemRow[] = [
+      {
+        campaign_id: 'test-campaign',
+        id: 'loot-ws',
+        name: 'Drop',
+        kind: 'consumable',
+        description: null,
+        image_url: ws,
+      },
+    ];
+    const encWs: EncounterRow[] = [
+      {
+        campaign_id: 'test-campaign',
+        id: 'enc-ws',
+        type: 'basic',
+        name: 'E',
+        strikes: 1,
+        gold: 0,
+        xp: null,
+        image_url: ws,
+        loot_item_id: 'loot-ws',
+        sort_order: 0,
+      },
+    ];
+    const anomaliesWs: DimensionalAnomalyRow[] = [
+      { ...anomalies[0], id: 'anom-ws', image_url: ws },
+    ];
+    const pkg = campaignRowsToCampaignPackage(
+      campaignWs,
+      lootWs,
+      encWs,
+      rifts,
+      anomaliesWs
+    );
+    expect(pkg.realm.hero_image_url).toBe(ws);
+    expect(pkg.encounters[0].image_url).toBe(ws);
+    expect(pkg.encounters[0].loot_drop?.image_url).toBe(ws);
+    expect(pkg.anomalies[0].image_url).toBe(ws);
+  });
 });

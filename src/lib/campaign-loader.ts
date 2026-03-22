@@ -7,6 +7,7 @@ import type {
   NarrativeRiftStage,
   Realm,
 } from '@/types/campaign';
+import { normalizeCampaignContentUrl } from '@/lib/campaign-asset-url';
 import { isSupabaseConfigured } from '@/lib/supabase-config';
 import { supabase } from './supabase';
 
@@ -78,6 +79,16 @@ function parseStartingHex(raw: unknown): { q: number; r: number } | undefined {
   return undefined;
 }
 
+/**
+ * Applies {@link normalizeCampaignContentUrl}; if that yields `undefined` (empty/unsuitable input),
+ * keeps the original non-null string so behavior matches required realm URL fields (`?? row.field`).
+ * `null` / `undefined` columns become `undefined` on the model.
+ */
+function normalizeDbImageUrl(raw: string | null | undefined): string | undefined {
+  if (raw == null) return undefined;
+  return normalizeCampaignContentUrl(raw) ?? raw;
+}
+
 function toRealm(row: CampaignRow): Realm {
   return {
     id: row.id,
@@ -87,9 +98,9 @@ function toRealm(row: CampaignRow): Realm {
     grid_cols: row.grid_cols ?? undefined,
     grid_rows: row.grid_rows ?? undefined,
     startingHex: parseStartingHex(row.starting_hex),
-    hero_image_url: row.hero_image_url,
-    map_background_url: row.map_background_url,
-    loot_frame_url: row.loot_frame_url,
+    hero_image_url: normalizeDbImageUrl(row.hero_image_url) ?? row.hero_image_url,
+    map_background_url: normalizeDbImageUrl(row.map_background_url) ?? row.map_background_url,
+    loot_frame_url: normalizeDbImageUrl(row.loot_frame_url) ?? row.loot_frame_url,
   };
 }
 
@@ -99,7 +110,7 @@ function lootRowToDrop(row: LootItemRow): EncounterLootDrop {
     name: row.name,
     kind: row.kind,
     description: row.description ?? undefined,
-    image_url: row.image_url ?? undefined,
+    image_url: normalizeDbImageUrl(row.image_url),
   };
 }
 
@@ -138,7 +149,7 @@ export function campaignRowsToCampaignPackage(
         name: row.name,
         strikes: row.strikes,
         gold: row.gold,
-        image_url: row.image_url ?? undefined,
+        image_url: normalizeDbImageUrl(row.image_url),
         loot_drop,
       };
       if (row.xp != null) enc.xp = row.xp;
@@ -150,7 +161,7 @@ export function campaignRowsToCampaignPackage(
     .map((row) => ({
       id: row.id,
       name: row.name,
-      image_url: row.image_url ?? undefined,
+      image_url: normalizeDbImageUrl(row.image_url),
       cost: row.cost,
       resource: row.resource,
       resource_amount: row.resource_amount,
@@ -165,7 +176,7 @@ export function campaignRowsToCampaignPackage(
         id: row.id,
         name: row.name,
         description: row.description,
-        image_url: row.image_url ?? undefined,
+        image_url: normalizeDbImageUrl(row.image_url),
         stages: parseRiftStages(row.stages),
       };
       if (row.completion_xp != null) rift.completion_xp = row.completion_xp;

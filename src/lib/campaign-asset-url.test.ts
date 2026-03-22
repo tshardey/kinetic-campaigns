@@ -7,6 +7,7 @@ import {
   OMIJA_STORAGE_PREFIX,
   campaignAssetsUsePublicFolder,
   campaignOmijaAssetUrl,
+  normalizeCampaignContentUrl,
 } from './campaign-asset-url';
 import { SUPABASE_PLACEHOLDER_PUBLISHABLE_KEY } from './supabase-config';
 
@@ -59,6 +60,50 @@ describe('campaignOmijaAssetUrl', () => {
     vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test');
     expect(campaignOmijaAssetUrl('scenes/x.png')).toBe(
       `https://abc.supabase.co/storage/v1/object/public/${CAMPAIGN_ASSETS_BUCKET}/${OMIJA_STORAGE_PREFIX}/scenes/x.png`
+    );
+  });
+});
+
+describe('normalizeCampaignContentUrl', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_SUPABASE_URL', 'https://proj.supabase.co');
+    vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test');
+    vi.stubEnv('VITE_CAMPAIGN_ASSETS_USE_PUBLIC', undefined);
+    vi.stubEnv('BASE_URL', '/kinetic-campaigns/');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('returns undefined for null/empty', () => {
+    expect(normalizeCampaignContentUrl(null)).toBeUndefined();
+    expect(normalizeCampaignContentUrl('')).toBeUndefined();
+    expect(normalizeCampaignContentUrl('   ')).toBeUndefined();
+  });
+
+  it('passes through Supabase Storage URLs', () => {
+    const u = `https://proj.supabase.co/storage/v1/object/public/${CAMPAIGN_ASSETS_BUCKET}/campaign/omija/loot/x.png`;
+    expect(normalizeCampaignContentUrl(u)).toBe(u);
+  });
+
+  it('passes through unrelated absolute URLs', () => {
+    expect(normalizeCampaignContentUrl('https://example.com/potion.png')).toBe('https://example.com/potion.png');
+  });
+
+  it('rewrites GitHub Pages app paths to Storage when Supabase is configured', () => {
+    expect(
+      normalizeCampaignContentUrl(
+        'https://user.github.io/kinetic-campaigns/campaign/omija/loot/memory-censer.png'
+      )
+    ).toBe(
+      `https://proj.supabase.co/storage/v1/object/public/${CAMPAIGN_ASSETS_BUCKET}/${OMIJA_STORAGE_PREFIX}/loot/memory-censer.png`
+    );
+  });
+
+  it('rewrites path-only omija assets', () => {
+    expect(normalizeCampaignContentUrl('campaign/omija/loot/loot-frame.png')).toBe(
+      `https://proj.supabase.co/storage/v1/object/public/${CAMPAIGN_ASSETS_BUCKET}/${OMIJA_STORAGE_PREFIX}/loot/loot-frame.png`
     );
   });
 });

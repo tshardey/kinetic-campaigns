@@ -33,3 +33,25 @@ export function campaignOmijaAssetUrl(relativePath: string): string {
   }
   return supabaseStoragePublicObjectUrl(trimmed);
 }
+
+const OMIJA_SEGMENT = 'campaign/omija/';
+
+/**
+ * Rewrites stored campaign image URLs (e.g. GitHub Pages `/…/campaign/omija/…` or path-only seeds)
+ * to the same resolution as {@link campaignOmijaAssetUrl}. Leaves Supabase Storage URLs and unrelated
+ * absolute URLs unchanged.
+ */
+export function normalizeCampaignContentUrl(url: string | null | undefined): string | undefined {
+  if (url == null || url.trim() === '') return undefined;
+  const trimmed = url.trim();
+  if (trimmed.includes('/storage/v1/object/public/')) {
+    return trimmed;
+  }
+  const idx = trimmed.indexOf(OMIJA_SEGMENT);
+  if (idx < 0) {
+    return trimmed;
+  }
+  const suffix = trimmed.slice(idx + OMIJA_SEGMENT.length).replace(/^\/+/, '');
+  if (!suffix) return trimmed;
+  return campaignOmijaAssetUrl(suffix);
+}

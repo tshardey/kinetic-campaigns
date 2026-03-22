@@ -260,7 +260,7 @@ function AppGameShell({
               onMove={movePlayer}
               onOpenNexus={() => setActiveTab('nexus')}
               onEngageEncounter={engageEncounter}
-              useDimensionalAnchor={useDimensionalAnchor}
+              applyDimensionalAnchor={useDimensionalAnchor}
               onScoutHex={onScoutHex}
               onAttemptRiftStage={attemptRiftStage}
               onContinueFromVictory={() => setJustClearedHexId(null)}

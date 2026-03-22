@@ -3,6 +3,7 @@ import {
   loadGameStateLocal,
   saveGameStateLocal,
   getDefaultMapState,
+  clearOfflineLegacyPersistence,
   type PersistedGameState,
   type MapState,
 } from './game-state-storage';
@@ -219,6 +220,22 @@ describe('game-state-storage', () => {
         level: 2,
         currency: 100,
       });
+    });
+  });
+
+  describe('clearOfflineLegacyPersistence', () => {
+    it('removes game state and legacy character keys', () => {
+      saveGameStateLocal({
+        character: validCharacter,
+        mapState: getDefaultMapState(COLS, ROWS),
+      });
+      saveCharacterLocal(validCharacter);
+      expect(mockStorage.getItem('kinetic-campaigns-game-state')).not.toBeNull();
+      expect(mockStorage.getItem('kinetic-campaigns-character')).not.toBeNull();
+      clearOfflineLegacyPersistence();
+      expect(mockStorage.getItem('kinetic-campaigns-game-state')).toBeNull();
+      expect(mockStorage.getItem('kinetic-campaigns-character')).toBeNull();
+      expect(loadGameStateLocal(COLS, ROWS)).toBeNull();
     });
   });
 });

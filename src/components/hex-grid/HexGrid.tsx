@@ -48,7 +48,8 @@ interface HexGridProps {
   onEngageEncounter: (hexId: string, encounter: MapEncounter, options?: { phaseStrike?: boolean }) => void;
   /** When the Nexus Tent hex is clicked, open the Nexus UI (e.g. switch to Nexus tab). */
   onOpenNexus?: () => void;
-  useDimensionalAnchor?: (hexId: string) => boolean;
+  /** Attempt Dimensional Anchor on this hex (playbook move). */
+  applyDimensionalAnchor?: (hexId: string) => boolean;
   onScoutHex?: (hexId: string) => boolean;
   onAttemptRiftStage: (hexId: string, riftId: string, stageIndex: number) => boolean;
   onContinueFromVictory: () => void;
@@ -75,7 +76,7 @@ export function HexGrid({
   onMove,
   onOpenNexus,
   onEngageEncounter,
-  useDimensionalAnchor,
+  applyDimensionalAnchor,
   onScoutHex,
   onAttemptRiftStage,
   onContinueFromVictory,
@@ -203,12 +204,12 @@ export function HexGrid({
               (currentEncounter.type === 'basic' || currentEncounter.type === 'elite' || currentEncounter.type === 'boss')
             }
             onDimensionalAnchor={
-              useDimensionalAnchor && (currentEncounter.type === 'elite' || currentEncounter.type === 'boss')
-                ? () => useDimensionalAnchor(playerHexId)
+              applyDimensionalAnchor && (currentEncounter.type === 'elite' || currentEncounter.type === 'boss')
+                ? () => applyDimensionalAnchor(playerHexId)
                 : undefined
             }
             canDimensionalAnchor={
-              !!useDimensionalAnchor &&
+              !!applyDimensionalAnchor &&
               !!resources &&
               hasCharacterMove(character, 'dimensional-anchor') &&
               (currentEncounter.type === 'elite' || currentEncounter.type === 'boss') &&

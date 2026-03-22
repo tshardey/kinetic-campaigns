@@ -50,6 +50,7 @@ export function getConsumableEffect(itemId: string): ConsumableResult | null {
  * Whether this consumable requires a choice (e.g. Haste vs Flow) before use.
  */
 export function consumableRequiresChoice(_itemId: string): boolean {
+  void _itemId;
   return false;
 }
 

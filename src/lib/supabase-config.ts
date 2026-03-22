@@ -1,6 +1,6 @@
 /**
- * Single source of truth for whether env vars refer to a real Supabase project.
- * Must stay aligned with fallbacks in `supabase.ts` (`createClient` when env is unset).
+ * Single source of truth for Supabase env resolution and “configured” detection.
+ * Must stay aligned with `createClient` in `supabase.ts` and GitHub Pages build injection.
  */
 
 /** Default URL passed to `createClient` when `VITE_SUPABASE_URL` is missing (local CLI, tests). */
@@ -8,6 +8,19 @@ export const SUPABASE_DEFAULT_URL = 'http://127.0.0.1:54321';
 
 /** Default publishable key when `VITE_SUPABASE_PUBLISHABLE_KEY` is missing — not a valid project key. */
 export const SUPABASE_PLACEHOLDER_PUBLISHABLE_KEY = 'public-anon-placeholder';
+
+/**
+ * Resolved URL and publishable key for `@supabase/supabase-js` `createClient`.
+ * Uses Vite `import.meta.env` with the same fallbacks as local dev when vars are unset.
+ */
+export function getSupabaseClientEnv(): { url: string; publishableKey: string } {
+  const urlFromEnv = import.meta.env.VITE_SUPABASE_URL?.trim();
+  const keyFromEnv = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim();
+  return {
+    url: urlFromEnv || SUPABASE_DEFAULT_URL,
+    publishableKey: keyFromEnv || SUPABASE_PLACEHOLDER_PUBLISHABLE_KEY,
+  };
+}
 
 /**
  * True when both Vite env vars are set to non-empty values and the key is not the placeholder.

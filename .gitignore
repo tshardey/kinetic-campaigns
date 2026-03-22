@@ -49,4 +49,4 @@ coverage/
 # Local image working directory (not deployed)
 images/
 
-# Campaign images in public/campaign/omija/ are tracked and deploy with the build
+# Optional: omit public/campaign/omija/ from git when using Storage-only (VITE_CAMPAIGN_ASSETS_USE_PUBLIC=false).

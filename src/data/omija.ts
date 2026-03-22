@@ -2,8 +2,8 @@
  * Campaign package: The Verdant Expanse of Omija
  * Sourced from realm_packages/Realm Package_ The Verdant Expanse of Omija (1).md
  *
- * Images: with Supabase env set, URLs point at the `campaign-assets` public bucket; otherwise
- * `public/campaign/omija/` via BASE_URL (e.g. GitHub Pages base path).
+ * Images: see `campaignOmijaAssetUrl` — Storage by default when configured, optional `public/` fallback,
+ * or `VITE_CAMPAIGN_ASSETS_USE_PUBLIC=false` for Storage-only (no images in repo).
  */
 import type {
   CampaignPackage,

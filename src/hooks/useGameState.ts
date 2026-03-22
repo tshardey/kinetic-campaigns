@@ -931,12 +931,18 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
           state,
         });
       }, 400);
-      return () => {
-        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      };
+    } else {
+      saveGameStateLocal(state);
     }
 
-    saveGameStateLocal(state);
+    // Always clear the debounced cloud save on dep change or unmount, including when
+    // switching from cloud to local or when auth drops — not only when the last run used cloud.
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
   }, [
     character,
     resources,

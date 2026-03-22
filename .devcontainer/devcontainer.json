@@ -6,7 +6,8 @@
   "remoteEnv": {
     "SUPABASE_PROJECT_REF": "kzylfxqfifvqfaojhhew",
     "VITE_SUPABASE_URL": "https://kzylfxqfifvqfaojhhew.supabase.co",
-    "VITE_SUPABASE_PUBLISHABLE_KEY": "${localEnv:VITE_SUPABASE_PUBLISHABLE_KEY}"
+    "VITE_SUPABASE_PUBLISHABLE_KEY": "${localEnv:VITE_SUPABASE_PUBLISHABLE_KEY}",
+    "VITE_CAMPAIGN_ASSETS_USE_PUBLIC": "false"
   },
   "customizations": {
     "vscode": {

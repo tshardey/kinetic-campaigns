@@ -2,7 +2,12 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { isSupabaseConfigured, SUPABASE_PLACEHOLDER_PUBLISHABLE_KEY } from './supabase-config';
+import {
+  getSupabaseClientEnv,
+  isSupabaseConfigured,
+  SUPABASE_DEFAULT_URL,
+  SUPABASE_PLACEHOLDER_PUBLISHABLE_KEY,
+} from './supabase-config';
 
 describe('isSupabaseConfigured', () => {
   beforeEach(() => {
@@ -34,5 +39,32 @@ describe('isSupabaseConfigured', () => {
     vi.stubEnv('VITE_SUPABASE_URL', 'https://abc.supabase.co');
     vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test');
     expect(isSupabaseConfigured()).toBe(true);
+  });
+});
+
+describe('getSupabaseClientEnv', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_SUPABASE_URL', undefined);
+    vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY', undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('uses defaults when env is unset', () => {
+    expect(getSupabaseClientEnv()).toEqual({
+      url: SUPABASE_DEFAULT_URL,
+      publishableKey: SUPABASE_PLACEHOLDER_PUBLISHABLE_KEY,
+    });
+  });
+
+  it('uses trimmed env values when set', () => {
+    vi.stubEnv('VITE_SUPABASE_URL', '  https://xyz.supabase.co  ');
+    vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY', '  real-key  ');
+    expect(getSupabaseClientEnv()).toEqual({
+      url: 'https://xyz.supabase.co',
+      publishableKey: 'real-key',
+    });
   });
 });

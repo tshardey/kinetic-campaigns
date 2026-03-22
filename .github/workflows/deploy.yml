@@ -29,7 +29,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Vite inlines VITE_* at build time. Add repo secrets: Settings → Secrets and variables → Actions
+      # — VITE_SUPABASE_URL, VITE_SUPABASE_PUBLISHABLE_KEY (same names as .env.example).
       - name: Build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          # Optional repository variable: set to `false` when campaign images live only in Storage.
+          VITE_CAMPAIGN_ASSETS_USE_PUBLIC: ${{ vars.VITE_CAMPAIGN_ASSETS_USE_PUBLIC }}
         run: npm run build
 
       - name: Setup Pages

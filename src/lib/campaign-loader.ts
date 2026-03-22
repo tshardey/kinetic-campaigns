@@ -7,6 +7,8 @@ import type {
   NarrativeRiftStage,
   Realm,
 } from '@/types/campaign';
+import { OMIJA_CAMPAIGN_ID } from '@/constants/campaign-ids';
+import { omijaCampaign } from '@/data/omija';
 import { normalizeCampaignContentUrl } from '@/lib/campaign-asset-url';
 import { isSupabaseConfigured } from '@/lib/supabase-config';
 import { supabase } from './supabase';
@@ -194,6 +196,21 @@ export function campaignRowsToCampaignPackage(
   };
 }
 
+/**
+ * The Omija campaign row is often seeded without related `encounters` / `rifts` / `dimensional_anomalies`
+ * rows (FK-only migration). In that case the client would place zero map encounters. When the loaded
+ * realm is still Omija, fall back to bundled content for any empty slice so the grid matches local dev.
+ */
+export function mergeOmijaBundledContentIfNeeded(pkg: CampaignPackage): CampaignPackage {
+  if (pkg.realm.id !== OMIJA_CAMPAIGN_ID) return pkg;
+  return {
+    ...pkg,
+    encounters: pkg.encounters.length > 0 ? pkg.encounters : omijaCampaign.encounters,
+    anomalies: pkg.anomalies.length > 0 ? pkg.anomalies : omijaCampaign.anomalies,
+    rifts: pkg.rifts.length > 0 ? pkg.rifts : omijaCampaign.rifts,
+  };
+}
+
 async function fetchPublishedCampaignRow(): Promise<CampaignRow | null> {
   const explicitId = import.meta.env.VITE_CAMPAIGN_ID as string | undefined;
   if (explicitId) {
@@ -271,11 +288,12 @@ export async function loadActiveCampaign(): Promise<CampaignPackage | null> {
     return null;
   }
 
-  return campaignRowsToCampaignPackage(
+  const pkg = campaignRowsToCampaignPackage(
     campaign,
     (lootRes.data ?? []) as LootItemRow[],
     (encRes.data ?? []) as EncounterRow[],
     (riftRes.data ?? []) as RiftRow[],
     (anomRes.data ?? []) as DimensionalAnomalyRow[]
   );
+  return mergeOmijaBundledContentIfNeeded(pkg);
 }

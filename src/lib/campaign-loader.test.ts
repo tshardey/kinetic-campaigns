@@ -4,12 +4,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   campaignRowsToCampaignPackage,
+  mergeOmijaBundledContentIfNeeded,
   type CampaignRow,
   type LootItemRow,
   type EncounterRow,
   type RiftRow,
   type DimensionalAnomalyRow,
 } from './campaign-loader';
+import { OMIJA_CAMPAIGN_ID } from '@/constants/campaign-ids';
 
 describe('campaignRowsToCampaignPackage', () => {
   const campaign: CampaignRow = {
@@ -139,5 +141,45 @@ describe('campaignRowsToCampaignPackage', () => {
     expect(pkg.encounters[0].image_url).toBe(ws);
     expect(pkg.encounters[0].loot_drop?.image_url).toBe(ws);
     expect(pkg.anomalies[0].image_url).toBe(ws);
+  });
+});
+
+describe('mergeOmijaBundledContentIfNeeded', () => {
+  it('leaves non-Omija packages unchanged', () => {
+    const campaign: CampaignRow = {
+      id: 'other',
+      name: 'Other',
+      theme_description: 'x',
+      grid_radius: 4,
+      grid_cols: 14,
+      grid_rows: 9,
+      starting_hex: { q: 0, r: 0 },
+      hero_image_url: 'https://example.com/h.png',
+      map_background_url: 'https://example.com/m.png',
+      loot_frame_url: 'https://example.com/f.png',
+    };
+    const pkg = campaignRowsToCampaignPackage(campaign, [], [], [], []);
+    const merged = mergeOmijaBundledContentIfNeeded(pkg);
+    expect(merged.encounters).toHaveLength(0);
+  });
+
+  it('fills encounters, rifts, and anomalies from bundled Omija when DB rows are empty', () => {
+    const campaign: CampaignRow = {
+      id: OMIJA_CAMPAIGN_ID,
+      name: 'Omija',
+      theme_description: 'x',
+      grid_radius: 4,
+      grid_cols: 14,
+      grid_rows: 9,
+      starting_hex: { q: -1, r: 4 },
+      hero_image_url: 'https://example.com/h.png',
+      map_background_url: 'https://example.com/m.png',
+      loot_frame_url: 'https://example.com/f.png',
+    };
+    const pkg = campaignRowsToCampaignPackage(campaign, [], [], [], []);
+    const merged = mergeOmijaBundledContentIfNeeded(pkg);
+    expect(merged.encounters.length).toBeGreaterThan(0);
+    expect(merged.rifts.length).toBeGreaterThan(0);
+    expect(merged.anomalies.length).toBeGreaterThan(0);
   });
 });

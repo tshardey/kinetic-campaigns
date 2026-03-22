@@ -136,3 +136,12 @@ export function loadGameStateLocal(cols: number, rows: number): PersistedGameSta
 export function saveGameStateLocal(state: PersistedGameState): void {
   localStorage.setItem(GAME_STATE_KEY, JSON.stringify(state));
 }
+
+/**
+ * Remove offline `localStorage` snapshots used before Supabase migration.
+ * The character key matches the legacy key and `character-storage` (`kinetic-campaigns-character`).
+ */
+export function clearOfflineLegacyPersistence(): void {
+  localStorage.removeItem(GAME_STATE_KEY);
+  localStorage.removeItem(LEGACY_CHARACTER_KEY);
+}

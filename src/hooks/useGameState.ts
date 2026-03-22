@@ -5,7 +5,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { loadPersistedGameStateFromSupabase, persistGameStateToSupabase } from '@/lib/persist-game-state';
+import { persistGameStateToSupabase } from '@/lib/persist-game-state';
+import { resolvePersistedGameStateForSignedInUser } from '@/lib/legacy-local-to-supabase-migration';
 import type { Character, CharacterResources, Progression, InventoryItem, LevelUpChoice } from '@/types/character';
 import type { ActivityType } from '@/types/character';
 import type { MapEncounter, NexusReward } from '@/types/campaign';
@@ -236,7 +237,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
     setPersistHydrated(false);
 
     void (async () => {
-      const loaded = await loadPersistedGameStateFromSupabase({
+      const loaded = await resolvePersistedGameStateForSignedInUser({
         userId: user.id,
         campaignId,
         cols,
@@ -246,18 +247,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
 
       if (cancelled) return;
 
-      let toApply: PersistedGameState | null = loaded;
-      if (!toApply) {
-        const local = loadGameStateLocal(cols, rows);
-        if (local?.character) {
-          toApply = local;
-          void persistGameStateToSupabase({
-            userId: user.id,
-            campaignId,
-            state: local,
-          });
-        }
-      }
+      const toApply: PersistedGameState | null = loaded;
 
       if (toApply?.character) {
         const c = toApply.character;

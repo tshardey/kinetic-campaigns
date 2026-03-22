@@ -55,7 +55,12 @@ A fitness game where you hex crawl around completing objectives.
 
 If the browser console shows `upsert characters failed` and `characters_campaign_id_fkey`, PostgreSQL has no matching row in `public.campaigns` for the campaign id you are playing (for example `omija` when using bundled Omija content).
 
-Apply migrations to your hosted project (for example `supabase link` then `supabase db push`), or run the SQL in `supabase/migrations/20250322140000_seed_omija_campaign_for_fk.sql` in the Supabase **SQL Editor** so the `omija` campaign row exists.
+**Deploy the latest migrations** to your hosted project (`supabase link` then `supabase db push`). That includes:
+
+- A one-time `INSERT` for `omija` (`20250322140000_seed_omija_campaign_for_fk.sql`), and  
+- A function `ensure_omija_campaign_row` (`20250322150000_ensure_omija_campaign_row_rpc.sql`) that the app calls before saving so the row exists even if the earlier migration was skipped.
+
+If you cannot use the CLI, run the SQL from those migration files in the Supabase **SQL Editor** (in order).
 
 ### Scripts
 

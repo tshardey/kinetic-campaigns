@@ -3,6 +3,7 @@
  */
 
 import type { Character } from '@/types/character';
+import { ensureCampaignRowForPersist } from '@/lib/ensure-campaign-fk';
 import { supabase } from '@/lib/supabase';
 import { ensureCharacterHp } from '@/lib/game-state-storage';
 import { isSupabaseConfigured } from '@/lib/supabase-config';
@@ -71,6 +72,13 @@ export async function saveCharacter(character: Character, campaignId: string): P
   } = await supabase.auth.getUser();
   if (!user) {
     saveCharacterLocal(character);
+    return;
+  }
+
+  const campaignReady = await ensureCampaignRowForPersist(campaignId);
+  if (!campaignReady) {
+    saveCharacterLocal(character);
+    console.warn('[character-storage] skipping cloud save after ensure_omija_campaign_row failure; saved to localStorage');
     return;
   }
 

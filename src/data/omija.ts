@@ -13,10 +13,13 @@ import type {
   NarrativeRiftStage,
   Realm,
 } from '@/types/campaign';
+import { OMIJA_CAMPAIGN_ID } from '@/constants/campaign-ids';
 import { campaignOmijaAssetUrl as asset } from '@/lib/campaign-asset-url';
 
+export { OMIJA_CAMPAIGN_ID };
+
 const realm: Realm = {
-  id: 'omija',
+  id: OMIJA_CAMPAIGN_ID,
   name: 'The Verdant Expanse of Omija',
   theme_description:
     'A whimsical, sun-drenched archipelago where the physical and spiritual worlds hold hands. Memories are tangible, and the locals use alchemy and martial artistry to maintain balance. The foul "Inkrot" anomaly has begun corrupting wildlife and kami—you must cleanse the island of the Abyssal Tide.',

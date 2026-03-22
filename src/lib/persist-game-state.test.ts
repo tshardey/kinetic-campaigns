@@ -31,10 +31,12 @@ const mocks = vi.hoisted(() => ({
   maybeSingleGs: vi.fn(),
   upsertChar: vi.fn(),
   upsertGs: vi.fn(),
+  rpc: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
+    rpc: mocks.rpc,
     from: (table: string) => {
       if (table === 'characters') {
         return {
@@ -71,6 +73,8 @@ describe('persist-game-state', () => {
     mocks.maybeSingleGs.mockReset();
     mocks.upsertChar.mockReset();
     mocks.upsertGs.mockReset();
+    mocks.rpc.mockReset();
+    mocks.rpc.mockResolvedValue({ error: null });
     mocks.upsertChar.mockResolvedValue({ error: null });
     mocks.upsertGs.mockResolvedValue({ error: null });
   });
@@ -145,6 +149,7 @@ describe('persist-game-state', () => {
       state,
     });
 
+    expect(mocks.rpc).toHaveBeenCalledWith('ensure_omija_campaign_row');
     expect(mocks.upsertChar).toHaveBeenCalledWith(
       expect.objectContaining({
         user_id: USER_ID,
@@ -159,6 +164,61 @@ describe('persist-game-state', () => {
         campaign_id: CAMPAIGN_ID,
         map_state: state.mapState,
       }),
+      { onConflict: 'user_id,campaign_id' }
+    );
+  });
+
+  it('persistGameStateToSupabase skips upserts and writes local snapshot when ensure RPC fails', async () => {
+    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'function not found' } });
+    const state: PersistedGameState = {
+      character: validCharacter,
+      mapState: getDefaultMapState(COLS, ROWS),
+    };
+    const store: Record<string, string> = {};
+    const mockStorage: Storage = {
+      getItem: (k: string) => store[k] ?? null,
+      setItem: (k: string, v: string) => {
+        store[k] = v;
+      },
+      removeItem: (k: string) => {
+        delete store[k];
+      },
+      clear: () => {
+        for (const k of Object.keys(store)) delete store[k];
+      },
+      get length() {
+        return Object.keys(store).length;
+      },
+      key: () => null,
+    };
+    vi.stubGlobal('localStorage', mockStorage);
+
+    await persistGameStateToSupabase({
+      userId: USER_ID,
+      campaignId: CAMPAIGN_ID,
+      state,
+    });
+
+    expect(mocks.upsertChar).not.toHaveBeenCalled();
+    expect(mocks.upsertGs).not.toHaveBeenCalled();
+    const raw = mockStorage.getItem('kinetic-campaigns-game-state');
+    expect(raw).toBeTruthy();
+    expect(JSON.parse(raw!)).toMatchObject({ character: { name: validCharacter.name } });
+  });
+
+  it('persistGameStateToSupabase does not call ensure RPC for non-omija campaign', async () => {
+    const state: PersistedGameState = {
+      character: validCharacter,
+      mapState: getDefaultMapState(COLS, ROWS),
+    };
+    await persistGameStateToSupabase({
+      userId: USER_ID,
+      campaignId: 'other-realm',
+      state,
+    });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.upsertChar).toHaveBeenCalledWith(
+      expect.objectContaining({ campaign_id: 'other-realm' }),
       { onConflict: 'user_id,campaign_id' }
     );
   });
@@ -195,6 +255,7 @@ describe('persist-game-state', () => {
       state,
     });
 
+    expect(mocks.rpc).toHaveBeenCalledWith('ensure_omija_campaign_row');
     expect(mocks.upsertGs).not.toHaveBeenCalled();
     const raw = mockStorage.getItem('kinetic-campaigns-game-state');
     expect(raw).toBeTruthy();

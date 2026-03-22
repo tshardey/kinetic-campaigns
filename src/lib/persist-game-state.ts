@@ -3,6 +3,7 @@
  */
 
 import type { Progression } from '@/types/character';
+import { ensureCampaignRowForPersist } from '@/lib/ensure-campaign-fk';
 import { supabase } from '@/lib/supabase';
 import {
   ensureCharacterHp,
@@ -88,6 +89,12 @@ export async function persistGameStateToSupabase(params: {
   state: PersistedGameState;
 }): Promise<void> {
   const { userId, campaignId, state } = params;
+  const campaignReady = await ensureCampaignRowForPersist(campaignId);
+  if (!campaignReady) {
+    saveGameStateLocal(state);
+    console.warn('[persist] skipping cloud save after ensure_omija_campaign_row failure; saved to localStorage');
+    return;
+  }
   const characterPayload = {
     ...state.character,
     resources: state.character.resources,

@@ -5,6 +5,7 @@
 import type { CharacterStats } from '@/types/character';
 import type { InventoryItem } from '@/types/character';
 import type { EncounterLootDrop } from '@/types/campaign';
+import { resolveCampaignImageUrl } from '@/lib/campaign-asset-url';
 
 /** Result of using a consumable: deltas to apply. Caller merges with current state. */
 export interface ConsumableResult {
@@ -61,6 +62,6 @@ export function lootDropToInventoryItem(drop: EncounterLootDrop): InventoryItem 
     name: drop.name,
     kind: drop.kind,
     description: drop.description,
-    image_url: drop.image_url,
+    image_url: resolveCampaignImageUrl(drop.image_url),
   };
 }

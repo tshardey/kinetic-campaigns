@@ -6,6 +6,7 @@ import type {
 } from '@/types/campaign';
 import type { CharacterResources } from '@/types/character';
 import { canAffordEncounter } from '@/engine/resources';
+import { resolveCampaignImageUrl } from '@/lib/campaign-asset-url';
 
 function getFullEncounter(
   encounter: MapEncounter,
@@ -75,10 +76,13 @@ export function EncounterPanel({
   const full = getFullEncounter(encounter, campaign);
   const isCombat = full && 'strikes' in full;
   const isAnomaly = encounter.type === 'anomaly';
-  const imageUrl =
-    full && 'image_url' in full && full.image_url ? full.image_url : undefined;
+  const imageUrl = resolveCampaignImageUrl(
+    full && 'image_url' in full && full.image_url ? full.image_url : undefined
+  );
   const lootDrop =
     isCombat && 'loot_drop' in full ? (full as Encounter).loot_drop : undefined;
+  const lootItemImg = lootDrop ? resolveCampaignImageUrl(lootDrop.image_url) : undefined;
+  const frameUrl = resolveCampaignImageUrl(lootFrameUrl) ?? lootFrameUrl;
   const xp = isCombat && 'xp' in full ? (full as Encounter).xp : undefined;
   const xpEarned =
     xp ?? (encounter.type === 'basic' ? 1 : encounter.type === 'elite' ? 2 : encounter.type === 'boss' ? 4 : 0);
@@ -105,15 +109,15 @@ export function EncounterPanel({
           <div className="flex justify-center mb-4">
             <div className="relative inline-block w-32 h-32">
               {/* Item art behind the frame, slightly smaller so it stays inside the border */}
-              {lootDrop.image_url && (
+              {lootItemImg && (
                 <img
-                  src={lootDrop.image_url}
+                  src={lootItemImg}
                   alt={lootDrop.name}
                   className="absolute inset-[18%] w-[64%] h-[64%] object-contain"
                 />
               )}
               <img
-                src={lootFrameUrl}
+                src={frameUrl}
                 alt=""
                 className="absolute inset-0 w-full h-full object-contain pointer-events-none z-10"
                 aria-hidden
@@ -224,9 +228,9 @@ export function EncounterPanel({
               )}
               {lootDrop && (
                 <span className="text-slate-200 flex items-center gap-1.5">
-                  {lootDrop.image_url && (
+                  {lootItemImg && (
                     <img
-                      src={lootDrop.image_url}
+                      src={lootItemImg}
                       alt=""
                       className="w-5 h-5 object-contain rounded"
                     />

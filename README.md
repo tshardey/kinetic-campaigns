@@ -51,6 +51,12 @@ A fitness game where you hex crawl around completing objectives.
 - **Path:** files live under `public/campaign/omija/` (singular **campaign**, not `campaigns`).
 - After removing that folder, URLs must point at Supabase Storage: set `VITE_CAMPAIGN_ASSETS_USE_PUBLIC=false` in **root** `.env` (or use the one-liner above), ensure `VITE_SUPABASE_URL` is set, and **upload** the same assets into the `campaign-assets` bucket. If the bucket is empty or paths do not match, images will still fail to load.
 
+### Troubleshooting saves (`characters_campaign_id_fkey`)
+
+If the browser console shows `upsert characters failed` and `characters_campaign_id_fkey`, PostgreSQL has no matching row in `public.campaigns` for the campaign id you are playing (for example `omija` when using bundled Omija content).
+
+Apply migrations to your hosted project (for example `supabase link` then `supabase db push`), or run the SQL in `supabase/migrations/20250322140000_seed_omija_campaign_for_fk.sql` in the Supabase **SQL Editor** so the `omija` campaign row exists.
+
 ### Scripts
 
 | Command        | Description                |

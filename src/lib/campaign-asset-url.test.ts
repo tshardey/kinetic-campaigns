@@ -41,10 +41,12 @@ describe('campaignOmijaAssetUrl', () => {
     );
   });
 
-  it('is false-placeholder safe (same as supabase-config)', () => {
+  it('uses Storage when a project URL is set even if publishable key is still the placeholder', () => {
     vi.stubEnv('VITE_SUPABASE_URL', 'https://abc.supabase.co');
     vi.stubEnv('VITE_SUPABASE_PUBLISHABLE_KEY', SUPABASE_PLACEHOLDER_PUBLISHABLE_KEY);
-    expect(campaignOmijaAssetUrl('loot/loot-frame.png')).toBe('/campaign/omija/loot/loot-frame.png');
+    expect(campaignOmijaAssetUrl('loot/loot-frame.png')).toBe(
+      `https://abc.supabase.co/storage/v1/object/public/${CAMPAIGN_ASSETS_BUCKET}/${OMIJA_STORAGE_PREFIX}/loot/loot-frame.png`
+    );
   });
 
   it('uses Storage URLs when VITE_CAMPAIGN_ASSETS_USE_PUBLIC=false even without auth env', () => {

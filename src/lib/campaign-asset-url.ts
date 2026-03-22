@@ -1,4 +1,8 @@
-import { getSupabaseClientEnv, isSupabaseConfigured } from '@/lib/supabase-config';
+import {
+  getSupabaseClientEnv,
+  isSupabaseConfigured,
+  SUPABASE_DEFAULT_URL,
+} from '@/lib/supabase-config';
 
 /** Must match `supabase/migrations/*campaign_assets*` and upload destination. */
 export const CAMPAIGN_ASSETS_BUCKET = 'campaign-assets';
@@ -20,13 +24,26 @@ function supabaseStoragePublicObjectUrl(relativePath: string): string {
 }
 
 /**
+ * Use `public/campaign/omija/` only for local dev when no remote project URL is in the bundle.
+ * Production GitHub Pages builds do not ship those files; if `VITE_SUPABASE_URL` points at a real
+ * project, always emit Storage URLs even when `isSupabaseConfigured()` is false (e.g. key not inlined).
+ */
+function shouldEmitPublicFolderCampaignAssets(): boolean {
+  if (!campaignAssetsUsePublicFolder()) return false;
+  if (isSupabaseConfigured()) return false;
+  const url = import.meta.env.VITE_SUPABASE_URL?.trim();
+  if (url && url !== SUPABASE_DEFAULT_URL) return false;
+  return true;
+}
+
+/**
  * Absolute URL for an Omija campaign image.
  * - Default: Storage when Supabase env is configured; otherwise `public/campaign/omija/` via BASE_URL.
  * - `VITE_CAMPAIGN_ASSETS_USE_PUBLIC=false`: always Storage public URLs (set `VITE_SUPABASE_URL` or use local CLI default).
  */
 export function campaignOmijaAssetUrl(relativePath: string): string {
   const trimmed = relativePath.replace(/^\/+/, '');
-  if (campaignAssetsUsePublicFolder() && !isSupabaseConfigured()) {
+  if (shouldEmitPublicFolderCampaignAssets()) {
     const viteEnv = import.meta as unknown as { env?: { BASE_URL?: string } };
     const appBase = `${viteEnv?.env?.BASE_URL ?? '/'}`.replace(/\/+$/, '');
     return `${appBase}/campaign/omija/${trimmed}`;
@@ -54,4 +71,13 @@ export function normalizeCampaignContentUrl(url: string | null | undefined): str
   const suffix = trimmed.slice(idx + OMIJA_SEGMENT.length).replace(/^\/+/, '');
   if (!suffix) return trimmed;
   return campaignOmijaAssetUrl(suffix);
+}
+
+/**
+ * Resolves stored or legacy image URLs for display and inventory (e.g. old GitHub Pages paths in saves).
+ * Applies {@link normalizeCampaignContentUrl} then falls back to the original string when unchanged.
+ */
+export function resolveCampaignImageUrl(url: string | null | undefined): string | undefined {
+  if (url == null) return undefined;
+  return normalizeCampaignContentUrl(url) ?? url;
 }

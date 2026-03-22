@@ -7,6 +7,7 @@ import { getPlaybook, PLAYBOOKS } from '@/data/playbooks';
 import { ResourceDisplay } from './ResourceDisplay';
 import { ActivityLogger } from './ActivityLogger';
 import { hasCharacterMove } from '@/lib/character-moves';
+import { resolveCampaignImageUrl } from '@/lib/campaign-asset-url';
 
 interface CharacterPanelProps {
   character: Character;
@@ -220,14 +221,16 @@ export function CharacterPanel({
               <p className="text-xs text-slate-500 py-2">No items yet. Clear encounters for loot.</p>
             ) : (
               <ul className="space-y-2">
-                {(inventory ?? []).map((item, index) => (
+                {(inventory ?? []).map((item, index) => {
+                  const invImg = resolveCampaignImageUrl(item.image_url);
+                  return (
                   <li
                     key={`${item.id}-${index}`}
                     className="bg-slate-800 rounded-lg p-2 flex items-start gap-2"
                   >
-                    {item.image_url && (
+                    {invImg && (
                       <img
-                        src={item.image_url}
+                        src={invImg}
                         alt=""
                         className="w-10 h-10 object-contain shrink-0 rounded"
                       />
@@ -255,7 +258,8 @@ export function CharacterPanel({
                       )}
                     </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </div>

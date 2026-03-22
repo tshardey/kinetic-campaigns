@@ -1,6 +1,7 @@
 import type { NarrativeRift, NarrativeRiftStage } from '@/types/campaign';
 import type { Character, CharacterResources } from '@/types/character';
 import { canAffordRiftStage, getRiftStageCostLabel } from '@/engine/rift';
+import { resolveCampaignImageUrl } from '@/lib/campaign-asset-url';
 
 interface NarrativeRiftProps {
   rift: NarrativeRift;
@@ -33,6 +34,9 @@ export function NarrativeRiftPanel({
   const currentStageIndex = Math.min(completedStages, totalStages - 1);
   const currentStage: NarrativeRiftStage | undefined = rift.stages[currentStageIndex];
   const canAfford = currentStage ? canAffordRiftStage(resources, character.stats, currentStage) : false;
+  const frameUrl = resolveCampaignImageUrl(lootFrameUrl) ?? lootFrameUrl;
+  const completionLootImg =
+    rift.completion_loot != null ? resolveCampaignImageUrl(rift.completion_loot.image_url) : undefined;
 
   // Completion / victory view
   if (isJustCompleted && isFullyComplete) {
@@ -41,15 +45,15 @@ export function NarrativeRiftPanel({
         {rift.completion_loot && (
           <div className="flex justify-center mb-4">
             <div className="relative inline-block w-32 h-32">
-              {rift.completion_loot.image_url && (
+              {completionLootImg && (
                 <img
-                  src={rift.completion_loot.image_url}
+                  src={completionLootImg}
                   alt={rift.completion_loot.name}
                   className="absolute inset-[18%] w-[64%] h-[64%] object-contain"
                 />
               )}
               <img
-                src={lootFrameUrl}
+                src={frameUrl}
                 alt=""
                 className="absolute inset-0 w-full h-full object-contain pointer-events-none z-10"
                 aria-hidden
@@ -87,14 +91,15 @@ export function NarrativeRiftPanel({
   if (!currentStage) return null;
 
   const costLabel = getRiftStageCostLabel(currentStage);
+  const stageArtUrl = resolveCampaignImageUrl(currentStage.image_url);
 
   return (
     <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 bg-slate-800/95 border border-slate-600 p-0 rounded-2xl shadow-2xl w-[28rem] max-w-[95vw] overflow-hidden animate-in slide-in-from-bottom-10 fade-in">
       {/* Stage art */}
-      {currentStage.image_url && (
+      {stageArtUrl && (
         <div className="w-full min-h-40 max-h-72 bg-slate-900 flex items-center justify-center py-2">
           <img
-            src={currentStage.image_url}
+            src={stageArtUrl}
             alt=""
             className="max-w-full max-h-64 w-auto h-auto object-contain object-center"
           />

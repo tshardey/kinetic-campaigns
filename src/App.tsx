@@ -12,6 +12,7 @@ import type { UseCampaignResult } from '@/hooks/useCampaign';
 import { useCampaign } from '@/hooks/useCampaign';
 import { useGameState } from '@/hooks/useGameState';
 import { AuthBar } from '@/components/auth/AuthBar';
+import { resolveCampaignImageUrl } from '@/lib/campaign-asset-url';
 
 const MOCK_NEXUS_REWARDS: NexusReward[] = [
   { id: 1, title: 'Fancy Bath or Wellness Product', cost: 50, icon: '🛁', desc: 'Lush bath bomb, Epsom salts, or wellness treat (~1/week)' },
@@ -246,7 +247,10 @@ function AppGameShell({
             <HexGrid
               cols={cols}
               rows={rows}
-              mapBackgroundUrl={campaign.realm.map_background_url}
+              mapBackgroundUrl={
+                resolveCampaignImageUrl(campaign.realm.map_background_url) ??
+                campaign.realm.map_background_url
+              }
               playerPos={playerPos}
               revealedHexes={revealedHexes}
               clearedHexes={clearedHexes}
@@ -258,7 +262,9 @@ function AppGameShell({
               riftProgress={riftProgress}
               campaign={campaign}
               character={character}
-              lootFrameUrl={campaign.realm.loot_frame_url}
+              lootFrameUrl={
+                resolveCampaignImageUrl(campaign.realm.loot_frame_url) ?? campaign.realm.loot_frame_url
+              }
               resources={resources}
               startingHex={campaign.realm.startingHex}
               onMove={movePlayer}

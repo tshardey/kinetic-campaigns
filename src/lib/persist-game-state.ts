@@ -106,6 +106,11 @@ export async function persistGameStateToSupabase(params: {
 
   if (charErr) {
     console.error('[persist] upsert characters failed:', charErr.message);
+    if (charErr.message.includes('characters_campaign_id_fkey')) {
+      console.warn(
+        '[persist] Hint: add a matching row to public.campaigns for this campaign_id (see supabase/migrations and README), or run pending migrations.'
+      );
+    }
     saveGameStateLocal(state);
     console.warn('[persist] saved full game state to localStorage after cloud failure');
     return;

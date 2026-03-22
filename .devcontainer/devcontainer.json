@@ -2,7 +2,11 @@
   "name": "Kinetic Campaigns",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
   "postCreateCommand": "if [ -f package.json ]; then npm install; fi",
-  "forwardPorts": [5173, 54321],
+  "forwardPorts": [5173, 54321, 54322],
+  "remoteEnv": {
+    "SUPABASE_PROJECT_REF": "kzylfxqfifvqfaojhhew",
+    "VITE_SUPABASE_URL": "https://kzylfxqfifvqfaojhhew.supabase.co"
+  },
   "customizations": {
     "vscode": {
       "extensions": [

@@ -7,6 +7,7 @@ import { CharacterCreation } from '@/components/character-creation/CharacterCrea
 import { HexGrid } from '@/components/hex-grid/HexGrid';
 import { LevelUpModal } from '@/components/level-up/LevelUpModal';
 import { NexusTent } from '@/components/nexus/NexusTent';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { useCampaign } from '@/hooks/useCampaign';
 import { useGameState } from '@/hooks/useGameState';
@@ -22,7 +23,28 @@ const MOCK_NEXUS_REWARDS: NexusReward[] = [
   { id: 8, title: 'Fitness Retreat', cost: 2500, icon: '🏔️', desc: 'Weekend yoga retreat or wellness vacation (~1/year)' },
 ];
 
+/**
+ * Main shell: waits for Supabase auth bootstrap before mounting hooks that load
+ * user-owned state (campaign/game state will rely on session in follow-up work).
+ */
 function App() {
+  const { isSessionReady } = useAuth();
+  if (!isSessionReady) {
+    return (
+      <div
+        className="min-h-screen bg-slate-950 text-slate-200 font-sans flex items-center justify-center"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <p className="text-slate-400 text-sm">Loading session…</p>
+      </div>
+    );
+  }
+  return <AppContent />;
+}
+
+function AppContent() {
   const { toast } = useToast();
   const campaignState = useCampaign();
   const { cols, rows, campaign, placedEncounters, placedRifts } = campaignState;

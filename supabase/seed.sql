@@ -1,0 +1,1 @@
+-- Optional seed data. Campaign rows are typically inserted via the dashboard (service role) or a follow-up seed script.

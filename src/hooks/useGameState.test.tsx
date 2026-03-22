@@ -12,6 +12,9 @@ vi.mock('@/contexts/AuthContext', () => ({
     user: null,
     isSessionReady: true,
     isSupabaseConfigured: false,
+    signInWithPassword: async () => ({ error: null }),
+    signUp: async () => ({ error: null }),
+    signOut: async () => ({ error: null }),
   }),
 }));
 import type { Character } from '@/types/character';

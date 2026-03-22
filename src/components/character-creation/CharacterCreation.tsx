@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { buildCharacter, PLAYBOOKS } from '@/data/playbooks';
 import type { Character, PlaybookId } from '@/types/character';
 import { saveCharacter } from '@/lib/character-storage';
+import { AuthBar } from '@/components/auth/AuthBar';
 import { NameStep } from './NameStep';
 import { PlaybookStep } from './PlaybookStep';
 import { StartingMoveStep } from './StartingMoveStep';
@@ -29,7 +30,10 @@ export function CharacterCreation({ campaignId, onComplete }: CharacterCreationP
   const playbook = playbookId ? PLAYBOOKS.find((p) => p.id === playbookId) : null;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex items-center justify-center p-6">
+    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans flex items-center justify-center p-6 relative">
+      <div className="absolute top-4 right-4 z-10">
+        <AuthBar />
+      </div>
       <div className="w-full max-w-2xl">
         <header className="text-center mb-10">
           <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-blue-500">

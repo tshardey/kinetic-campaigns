@@ -41,12 +41,10 @@ function markLegacyMigrationComplete(userId: string, campaignId: string): void {
   localStorage.setItem(MIGRATION_V1_KEY, JSON.stringify([...next]));
 }
 
-/**
- * Load persisted game state for a signed-in user. On first run per user+campaign,
- * may read `localStorage`, upsert into Supabase, mark migration complete, and clear
- * legacy keys. After that, only Supabase is used for hydration.
- */
-export async function resolvePersistedGameStateForSignedInUser(params: {
+/** Prevents parallel first-time migrations from racing (both read local, one clears — other returns null). */
+const inflightFirstMigration = new Map<string, Promise<PersistedGameState | null>>();
+
+async function runFirstTimeMigration(params: {
   userId: string;
   campaignId: string;
   cols: number;
@@ -57,10 +55,6 @@ export async function resolvePersistedGameStateForSignedInUser(params: {
 
   const loadRemote = () =>
     loadPersistedGameStateFromSupabase({ userId, campaignId, cols, rows, startingHex });
-
-  if (isLegacyMigrationComplete(userId, campaignId)) {
-    return loadRemote();
-  }
 
   const remote = await loadRemote();
   const local = loadGameStateLocal(cols, rows);
@@ -81,4 +75,33 @@ export async function resolvePersistedGameStateForSignedInUser(params: {
   markLegacyMigrationComplete(userId, campaignId);
   clearOfflineLegacyPersistence();
   return null;
+}
+
+/**
+ * Load persisted game state for a signed-in user. On first run per user+campaign,
+ * may read `localStorage`, upsert into Supabase, mark migration complete, and clear
+ * legacy keys. After that, only Supabase is used for hydration.
+ */
+export async function resolvePersistedGameStateForSignedInUser(params: {
+  userId: string;
+  campaignId: string;
+  cols: number;
+  rows: number;
+  startingHex?: { q: number; r: number };
+}): Promise<PersistedGameState | null> {
+  const { userId, campaignId, cols, rows, startingHex } = params;
+
+  if (isLegacyMigrationComplete(userId, campaignId)) {
+    return loadPersistedGameStateFromSupabase({ userId, campaignId, cols, rows, startingHex });
+  }
+
+  const key = scopeKey(userId, campaignId);
+  const existing = inflightFirstMigration.get(key);
+  if (existing) return existing;
+
+  const promise = runFirstTimeMigration({ userId, campaignId, cols, rows, startingHex }).finally(() => {
+    inflightFirstMigration.delete(key);
+  });
+  inflightFirstMigration.set(key, promise);
+  return promise;
 }

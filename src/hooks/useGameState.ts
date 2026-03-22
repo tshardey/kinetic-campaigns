@@ -160,14 +160,12 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /**
-   * Local snapshot for offline / signed-out only. When Supabase is configured and a user is
-   * signed in, defer to `loadPersistedGameStateFromSupabase` in the effect below — do not
-   * seed from localStorage in the initializer (AppContent mounts after `isSessionReady`, so
-   * `user` reflects the resolved session on first paint).
+   * Always seed from localStorage when present so the first hook paint matches the browser
+   * save (including after sign-in remounts / session restore where `user` is already set).
+   * The signed-in hydration effect below replaces this with cloud + migration results.
    */
   const [initialLoaded] = useState<PersistedGameState | null>(() => {
     if (!isSupabaseConfigured) return loadGameStateLocal(cols, rows);
-    if (user) return null;
     return loadGameStateLocal(cols, rows);
   });
 
@@ -247,7 +245,15 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
 
       if (cancelled) return;
 
-      const toApply: PersistedGameState | null = loaded;
+      let toApply: PersistedGameState | null = loaded;
+
+      if (!toApply?.character) {
+        const fallback = loadGameStateLocal(cols, rows);
+        if (fallback?.character) {
+          toApply = fallback;
+          void persistGameStateToSupabase({ userId: user.id, campaignId, state: fallback });
+        }
+      }
 
       if (toApply?.character) {
         const c = toApply.character;

@@ -4,8 +4,8 @@
   "postCreateCommand": "if [ -f package.json ]; then npm install; fi",
   "forwardPorts": [5173, 54321, 54322],
   "remoteEnv": {
-    "SUPABASE_PROJECT_REF": "kzylfxqfifvqfaojhhew",
-    "VITE_SUPABASE_URL": "https://kzylfxqfifvqfaojhhew.supabase.co",
+    "SUPABASE_PROJECT_REF": "${localEnv:SUPABASE_PROJECT_REF}",
+    "VITE_SUPABASE_URL": "${localEnv:VITE_SUPABASE_URL}",
     "VITE_SUPABASE_PUBLISHABLE_KEY": "${localEnv:VITE_SUPABASE_PUBLISHABLE_KEY}",
     "VITE_CAMPAIGN_ASSETS_USE_PUBLIC": "false"
   },

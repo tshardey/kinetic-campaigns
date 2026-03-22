@@ -11,6 +11,7 @@ import { useToast } from '@/contexts/ToastContext';
 import type { UseCampaignResult } from '@/hooks/useCampaign';
 import { useCampaign } from '@/hooks/useCampaign';
 import { useGameState } from '@/hooks/useGameState';
+import { AuthBar } from '@/components/auth/AuthBar';
 
 const MOCK_NEXUS_REWARDS: NexusReward[] = [
   { id: 1, title: 'Fancy Bath or Wellness Product', cost: 50, icon: '🛁', desc: 'Lush bath bomb, Epsom salts, or wellness treat (~1/week)' },
@@ -195,14 +196,17 @@ function AppGameShell({
               <Tent className="w-4 h-4 mr-2" /> The Nexus Tent
             </button>
           </nav>
-          <button
-            type="button"
-            onClick={() => setShowHowToPlay(true)}
-            className="ml-auto p-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-800"
-            aria-label="How to play"
-          >
-            <HelpCircle className="w-5 h-5" />
-          </button>
+          <div className="ml-auto flex items-center gap-2 md:gap-3 shrink-0">
+            <AuthBar />
+            <button
+              type="button"
+              onClick={() => setShowHowToPlay(true)}
+              className="p-2 rounded-md text-slate-400 hover:text-white hover:bg-slate-800"
+              aria-label="How to play"
+            >
+              <HelpCircle className="w-5 h-5" />
+            </button>
+          </div>
         </header>
 
         {showHowToPlay && (

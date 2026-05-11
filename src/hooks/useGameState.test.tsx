@@ -1203,4 +1203,184 @@ describe('useGameState', () => {
       expect(result.current.anchorUses['3,3']).toBe(true);
     });
   });
+
+  describe('temporal: streak + attrition wiring', () => {
+    function makeUnclearedEncounterAtPlayer(): {
+      placedEncounters: Record<string, MapEncounter>;
+      hexId: string;
+    } {
+      const startId = getDefaultStartHexId(COLS, ROWS);
+      const [q, r] = startId.split(',').map(Number);
+      // Pick a basic encounter from the bundled campaign.
+      const enc = campaign.encounters.find((e) => e.type === 'basic')!;
+      const mapEnc: MapEncounter = {
+        id: enc.id,
+        type: enc.type,
+        name: enc.name,
+        strikes: enc.strikes,
+        gold: enc.gold,
+      };
+      // Player at startHex, encounter parked on adjacent hex; we move player there before checking attrition.
+      const adjacent = `${q + 1},${r}`;
+      void adjacent;
+      // Simpler: place encounter directly at startHex so player is parked on it from initial mount.
+      return { placedEncounters: { [startId]: mapEnc }, hexId: startId };
+    }
+
+    it('first logWorkout starts streak at 1 and stamps lastActiveTimestamp', () => {
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      act(() => result.current.setCharacter(validCharacter));
+      act(() => result.current.logWorkout('cardio', 20));
+      expect(result.current.character!.currentStreak).toBe(1);
+      expect(result.current.character!.lastActiveTimestamp).toBeTruthy();
+      expect(new Date(result.current.character!.lastActiveTimestamp!).getTime()).toBeGreaterThan(0);
+    });
+
+    it('same-day repeat logWorkout does not increment streak', () => {
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      act(() => result.current.setCharacter(validCharacter));
+      act(() => result.current.logWorkout('cardio', 20));
+      const after1 = result.current.character!.currentStreak;
+      act(() => result.current.logWorkout('strength', 20));
+      expect(result.current.character!.currentStreak).toBe(after1);
+    });
+
+    it('hitting the 3-day milestone grants currency and toasts', () => {
+      const toast = vi.fn();
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, toast })
+      );
+      // Seed a character mid-streak so the next log crosses the 3-day milestone.
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const yesterday = (() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 1);
+        return d.toISOString();
+      })();
+      void tz;
+      const seeded: Character = {
+        ...validCharacter,
+        currentStreak: 2,
+        lastActiveTimestamp: yesterday,
+      };
+      act(() => result.current.setCharacter(seeded));
+      const currencyBefore = result.current.progression.currency;
+      act(() => result.current.logWorkout('cardio', 20));
+      expect(result.current.character!.currentStreak).toBe(3);
+      expect(result.current.progression.currency).toBe(currencyBefore + 3 * 25);
+      expect(toast).toHaveBeenCalledWith(
+        expect.stringContaining('3-day streak'),
+        'info'
+      );
+    });
+
+    it('hydrate-time attrition: missed days + parked on uncleared encounter drains Wards', () => {
+      const { placedEncounters, hexId } = makeUnclearedEncounterAtPlayer();
+      const [q, r] = hexId.split(',').map(Number);
+      const threeDaysAgo = (() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 3);
+        return d.toISOString();
+      })();
+      const seeded: Character = {
+        ...validCharacter,
+        resources: { ...validCharacter.resources, wards: 5 },
+        currentStreak: 4,
+        lastActiveTimestamp: threeDaysAgo,
+      };
+      const mapState = { ...getDefaultMapState(COLS, ROWS), playerPos: { q, r } };
+      saveGameStateLocal({ character: seeded, mapState });
+
+      const toast = vi.fn();
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, placedEncounters, toast })
+      );
+      // Wait for the temporal effect to commit. renderHook synchronously runs effects.
+      expect(result.current.resources.wards).toBe(5 - 2); // 3-day gap = 2 missed days
+      expect(result.current.character!.currentStreak).toBe(0); // streak reset
+      expect(result.current.character!.lastActiveTimestamp).not.toBe(threeDaysAgo);
+      expect(toast).toHaveBeenCalledWith(expect.stringContaining('Dimensional Bleed'), 'info');
+    });
+
+    it('hydrate-time attrition: missed days but NOT on hostile encounter → no Ward drain, but streak still resets', () => {
+      const fourDaysAgo = (() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 4);
+        return d.toISOString();
+      })();
+      const seeded: Character = {
+        ...validCharacter,
+        resources: { ...validCharacter.resources, wards: 5 },
+        currentStreak: 6,
+        lastActiveTimestamp: fourDaysAgo,
+      };
+      saveGameStateLocal({ character: seeded, mapState: getDefaultMapState(COLS, ROWS) });
+
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      expect(result.current.resources.wards).toBe(5);
+      expect(result.current.character!.currentStreak).toBe(0);
+    });
+
+    it('hydrate-time attrition: 0 Wards triggers retreat + currency penalty', () => {
+      const { placedEncounters, hexId } = makeUnclearedEncounterAtPlayer();
+      const [q, r] = hexId.split(',').map(Number);
+      const twoDaysAgo = (() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 2);
+        return d.toISOString();
+      })();
+      const seeded: Character = {
+        ...validCharacter,
+        resources: { ...validCharacter.resources, wards: 0 },
+        progression: { ...validCharacter.progression, currency: 500 },
+        currentStreak: 3,
+        lastActiveTimestamp: twoDaysAgo,
+      };
+      const mapState = { ...getDefaultMapState(COLS, ROWS), playerPos: { q, r } };
+      saveGameStateLocal({ character: seeded, mapState });
+
+      const startId = getDefaultStartHexId(COLS, ROWS);
+      const [startQ, startR] = startId.split(',').map(Number);
+
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, placedEncounters })
+      );
+      // 2-day gap = 1 missed day → 1 day × $50/day = -$50
+      expect(result.current.progression.currency).toBe(500 - 50);
+      expect(result.current.playerPos).toEqual({ q: startQ, r: startR });
+      expect(result.current.character!.currentStreak).toBe(0);
+    });
+
+    it('does not re-apply attrition when dependent state changes after the one-shot ran', () => {
+      const { placedEncounters, hexId } = makeUnclearedEncounterAtPlayer();
+      const [q, r] = hexId.split(',').map(Number);
+      const threeDaysAgo = (() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 3);
+        return d.toISOString();
+      })();
+      const seeded: Character = {
+        ...validCharacter,
+        resources: { ...validCharacter.resources, wards: 5 },
+        currentStreak: 4,
+        lastActiveTimestamp: threeDaysAgo,
+      };
+      const mapState = { ...getDefaultMapState(COLS, ROWS), playerPos: { q, r } };
+      saveGameStateLocal({ character: seeded, mapState });
+
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, placedEncounters })
+      );
+      const wardsAfterFirstRun = result.current.resources.wards;
+      act(() => result.current.setResources((r) => ({ ...r, wards: 9 })));
+      expect(result.current.resources.wards).toBe(9);
+      expect(wardsAfterFirstRun).toBe(3);
+    });
+  });
 });

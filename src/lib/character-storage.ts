@@ -5,7 +5,7 @@
 import type { Character } from '@/types/character';
 import { ensureCampaignRowForPersist } from '@/lib/ensure-campaign-fk';
 import { supabase } from '@/lib/supabase';
-import { ensureCharacterHp } from '@/lib/game-state-storage';
+import { ensureCharacterDefaults } from '@/lib/game-state-storage';
 import { isSupabaseConfigured } from '@/lib/supabase-config';
 
 const STORAGE_KEY = 'kinetic-campaigns-character';
@@ -16,7 +16,7 @@ export function loadCharacterLocal(): Character | null {
     if (!raw) return null;
     const data = JSON.parse(raw) as Character;
     if (!data.name || !data.playbook || !data.startingMoveId || !data.stats) return null;
-    return ensureCharacterHp(data);
+    return ensureCharacterDefaults(data);
   } catch {
     return null;
   }
@@ -56,7 +56,7 @@ export async function loadCharacter(campaignId: string): Promise<Character | nul
   if (!payload?.name || !payload.playbook || !payload.startingMoveId || !payload.stats) {
     return null;
   }
-  return ensureCharacterHp(payload);
+  return ensureCharacterDefaults(payload);
 }
 
 /**

@@ -70,11 +70,19 @@ export function getDefaultMapState(
 
 const DEFAULT_HP = 5;
 
-export function ensureCharacterHp(c: Character): Character {
-  if (typeof c.hp !== 'number' || typeof c.maxHp !== 'number') {
-    return { ...c, hp: DEFAULT_HP, maxHp: DEFAULT_HP };
+/**
+ * Backfill optional Character fields that may be missing on legacy saves
+ * (HP, temporal/streak fields). Called from every load path.
+ */
+export function ensureCharacterDefaults(c: Character): Character {
+  let next: Character = c;
+  if (typeof next.hp !== 'number' || typeof next.maxHp !== 'number') {
+    next = { ...next, hp: DEFAULT_HP, maxHp: DEFAULT_HP };
   }
-  return c;
+  if (typeof next.currentStreak !== 'number') {
+    next = { ...next, currentStreak: 0 };
+  }
+  return next;
 }
 
 function parseLegacyCharacter(): Character | null {
@@ -83,7 +91,7 @@ function parseLegacyCharacter(): Character | null {
     if (!raw) return null;
     const data = JSON.parse(raw) as Character;
     if (!data.name || !data.playbook || !data.startingMoveId || !data.stats) return null;
-    return ensureCharacterHp(data);
+    return ensureCharacterDefaults(data);
   } catch {
     return null;
   }
@@ -109,7 +117,7 @@ export function loadGameStateLocal(cols: number, rows: number): PersistedGameSta
             contactedHexes: data.mapState.contactedHexes ?? [],
           };
           return {
-            character: ensureCharacterHp(data.character),
+            character: ensureCharacterDefaults(data.character),
             mapState,
             pendingLevelUp: data.pendingLevelUp ?? false,
             pendingProgressionAfterLevelUp: data.pendingProgressionAfterLevelUp ?? undefined,

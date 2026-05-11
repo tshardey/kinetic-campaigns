@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, BookOpen, ChevronDown, ChevronUp, Package, X } from 'lucide-react';
+import { Sparkles, BookOpen, ChevronDown, ChevronUp, Package, X, Flame } from 'lucide-react';
 import type { Character, CharacterResources, Progression, InventoryItem } from '@/types/character';
 import type { ActivityType } from '@/types/character';
 import { getXpCap } from '@/engine/progression';
@@ -273,7 +273,8 @@ export function CharacterPanel({
             <span className="text-sm text-slate-400">Level</span>
             <span className="text-2xl font-bold text-white ml-2">{progression.level}</span>
           </div>
-          <div className="text-right">
+          <div className="text-right flex items-center gap-2">
+            <StreakChip streak={character.currentStreak ?? 0} />
             <span className="text-xs text-amber-400 font-bold flex items-center">
               <Sparkles className="w-3 h-3 mr-1" /> {progression.currency} Credits
             </span>
@@ -296,5 +297,32 @@ export function CharacterPanel({
         <ActivityLogger onLogActivity={onLogActivity} />
       </div>
     </aside>
+  );
+}
+
+interface StreakChipProps {
+  streak: number;
+}
+
+function StreakChip({ streak }: StreakChipProps) {
+  const active = streak > 0;
+  const tooltip = active
+    ? `Active streak: ${streak} day${streak === 1 ? '' : 's'}. Log activity today to keep it alive — miss a full calendar day and it resets.`
+    : 'No active streak. Log any activity to start a daily streak.';
+  return (
+    <span
+      role="status"
+      aria-label={tooltip}
+      title={tooltip}
+      data-testid="streak-chip"
+      className={`text-xs font-bold flex items-center tabular-nums px-1.5 py-0.5 rounded border ${
+        active
+          ? 'text-orange-300 border-orange-500/40 bg-orange-500/10'
+          : 'text-slate-500 border-slate-700 bg-slate-800/60'
+      }`}
+    >
+      <Flame className={`w-3 h-3 mr-1 ${active ? '' : 'opacity-60'}`} aria-hidden />
+      {streak}d
+    </span>
   );
 }

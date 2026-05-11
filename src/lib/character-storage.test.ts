@@ -112,10 +112,10 @@ describe('character-storage', () => {
   });
 
   describe('round-trip', () => {
-    it('save then load preserves character', async () => {
+    it('save then load preserves character (with backfilled currentStreak default)', async () => {
       await saveCharacter(validCharacter, CAMPAIGN_ID);
       const loaded = await loadCharacter(CAMPAIGN_ID);
-      expect(loaded).toEqual(validCharacter);
+      expect(loaded).toEqual({ ...validCharacter, currentStreak: 0 });
     });
   });
 });

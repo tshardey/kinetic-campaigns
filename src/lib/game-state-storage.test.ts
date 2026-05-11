@@ -4,6 +4,7 @@ import {
   saveGameStateLocal,
   getDefaultMapState,
   clearOfflineLegacyPersistence,
+  ensureCharacterDefaults,
   type PersistedGameState,
   type MapState,
 } from './game-state-storage';
@@ -220,6 +221,62 @@ describe('game-state-storage', () => {
         level: 2,
         currency: 100,
       });
+    });
+  });
+
+  describe('ensureCharacterDefaults', () => {
+    it('backfills currentStreak=0 when missing', () => {
+      const { currentStreak: _omit, ...rest } = validCharacter as Character & { currentStreak?: number };
+      void _omit;
+      const fixed = ensureCharacterDefaults(rest as Character);
+      expect(fixed.currentStreak).toBe(0);
+    });
+
+    it('preserves existing currentStreak and lastActiveTimestamp', () => {
+      const c: Character = {
+        ...validCharacter,
+        currentStreak: 7,
+        lastActiveTimestamp: '2026-05-10T12:00:00-07:00',
+      };
+      const fixed = ensureCharacterDefaults(c);
+      expect(fixed.currentStreak).toBe(7);
+      expect(fixed.lastActiveTimestamp).toBe('2026-05-10T12:00:00-07:00');
+    });
+
+    it('leaves lastActiveTimestamp undefined when missing (first activity initializes it)', () => {
+      const fixed = ensureCharacterDefaults(validCharacter);
+      expect(fixed.lastActiveTimestamp).toBeUndefined();
+    });
+
+    it('still backfills hp/maxHp when missing alongside temporal fields', () => {
+      const c = { ...validCharacter } as Partial<Character> as Character;
+      delete (c as Partial<Character>).hp;
+      delete (c as Partial<Character>).maxHp;
+      const fixed = ensureCharacterDefaults(c);
+      expect(fixed.hp).toBe(5);
+      expect(fixed.maxHp).toBe(5);
+      expect(fixed.currentStreak).toBe(0);
+    });
+  });
+
+  describe('temporal fields persistence', () => {
+    it('round-trips currentStreak and lastActiveTimestamp through localStorage', () => {
+      const character: Character = {
+        ...validCharacter,
+        currentStreak: 4,
+        lastActiveTimestamp: '2026-05-11T08:30:00-07:00',
+      };
+      saveGameStateLocal({ character, mapState: getDefaultMapState(COLS, ROWS) });
+      const loaded = loadGameStateLocal(COLS, ROWS);
+      expect(loaded!.character.currentStreak).toBe(4);
+      expect(loaded!.character.lastActiveTimestamp).toBe('2026-05-11T08:30:00-07:00');
+    });
+
+    it('legacy save without temporal fields loads with defaults applied', () => {
+      saveGameStateLocal({ character: validCharacter, mapState: getDefaultMapState(COLS, ROWS) });
+      const loaded = loadGameStateLocal(COLS, ROWS);
+      expect(loaded!.character.currentStreak).toBe(0);
+      expect(loaded!.character.lastActiveTimestamp).toBeUndefined();
     });
   });
 

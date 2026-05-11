@@ -6,7 +6,7 @@ import type { Progression } from '@/types/character';
 import { ensureCampaignRowForPersist } from '@/lib/ensure-campaign-fk';
 import { supabase } from '@/lib/supabase';
 import {
-  ensureCharacterHp,
+  ensureCharacterDefaults,
   getDefaultMapState,
   saveGameStateLocal,
   type MapState,
@@ -52,7 +52,7 @@ export async function loadPersistedGameStateFromSupabase(params: {
     return null;
   }
 
-  const character = ensureCharacterHp(payload);
+  const character = ensureCharacterDefaults(payload);
 
   const { data: gsRow, error: gsErr } = await supabase
     .from('game_states')

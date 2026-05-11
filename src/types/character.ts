@@ -64,6 +64,10 @@ export interface Character {
   maxHp: number;
   /** Loot collected from encounters. */
   inventory?: InventoryItem[];
+  /** ISO 8601 timestamp (with offset) of the most recent activity log; absent until first logWorkout. */
+  lastActiveTimestamp?: string;
+  /** Consecutive-calendar-day activity streak, in player TZ. */
+  currentStreak?: number;
 }
 
 export type ActivityType = 'cardio' | 'strength' | 'yoga' | 'wellness';

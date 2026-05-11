@@ -18,6 +18,12 @@ import { getAdjacentHexIds, getHexIdsAtDistance } from '@/engine/hex-math';
 import { getDefaultStartHexId } from '@/engine/encounter-placement';
 import { applyArtifactOnAcquisition, getConsumableEffect, lootDropToInventoryItem } from '@/engine/inventory';
 import { canAffordRiftStage, spendForRiftStage } from '@/engine/rift';
+import {
+  evaluateTemporal,
+  applyAttrition,
+  streakMilestoneReached,
+  getStreakMilestoneCurrency,
+} from '@/engine/temporal';
 import { loadGameStateLocal, saveGameStateLocal, getDefaultMapState, type PersistedGameState } from '@/lib/game-state-storage';
 import { rollEnemyHp } from '@/engine/enemy-scaling';
 import { getCharacterMoveIds, hasCharacterMove } from '@/lib/character-moves';
@@ -329,7 +335,99 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
           : undefined
       )
     );
-  }, [character]);
+
+    if (!character) return;
+    const now = new Date();
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const prevStreak = character.currentStreak ?? 0;
+    const result = evaluateTemporal({
+      lastActiveISO: character.lastActiveTimestamp,
+      now,
+      timeZone,
+      currentStreak: prevStreak,
+    });
+    const milestone = streakMilestoneReached(prevStreak, result.nextStreak);
+    if (milestone) {
+      const reward = getStreakMilestoneCurrency(milestone);
+      setProgression((p) => addCurrency(p, reward));
+      notify(`${milestone}-day streak! +${reward} Currency.`, 'info');
+    }
+    setCharacterState((prev) =>
+      prev
+        ? { ...prev, currentStreak: result.nextStreak, lastActiveTimestamp: now.toISOString() }
+        : prev
+    );
+  }, [character, notify]);
+
+  /**
+   * One-shot temporal evaluation after persist hydrates.
+   * - Resets streak if a full calendar day was missed.
+   * - Applies Dimensional Bleed attrition if the player is parked on an uncleared hostile encounter.
+   * - Moves `lastActiveTimestamp` forward only when attrition was actually applied, so refreshes
+   *   don't re-penalize and brand-new characters don't get a fake "last active" timestamp before
+   *   their first workout.
+   */
+  const temporalEvalRanRef = useRef(false);
+  useEffect(() => {
+    if (!persistHydrated) return;
+    if (!character) return;
+    if (temporalEvalRanRef.current) return;
+    temporalEvalRanRef.current = true;
+
+    const now = new Date();
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const result = evaluateTemporal({
+      lastActiveISO: character.lastActiveTimestamp,
+      now,
+      timeZone,
+      currentStreak: character.currentStreak ?? 0,
+    });
+
+    if (result.isFirstActivity || result.missedCalendarDays === 0) return;
+
+    if (result.streakReset) {
+      setCharacterState((prev) => (prev ? { ...prev, currentStreak: 0 } : prev));
+    }
+
+    const playerHexId = `${playerPos.q},${playerPos.r}`;
+    const encounterHere = placedEncounters[playerHexId];
+    const hexHasUnclearedEncounter = Boolean(
+      encounterHere && encounterHere.type !== 'anomaly' && !clearedHexes.has(playerHexId)
+    );
+
+    const startHex =
+      realmStartingHex ??
+      (() => {
+        const startHexId = getDefaultStartHexId(cols, rows);
+        const [q, r] = startHexId.split(',').map(Number);
+        return { q, r };
+      })();
+
+    const attrition = applyAttrition({
+      missedCalendarDays: result.missedCalendarDays,
+      wards: resources.wards,
+      hexHasUnclearedEncounter,
+      startHex,
+      currency: progression.currency,
+    });
+
+    let applied = false;
+    if (attrition.wardsSpent > 0) {
+      setResources((prev) => ({ ...prev, wards: attrition.newWards }));
+      applied = true;
+    }
+    if (attrition.retreatTriggered) {
+      setPlayerPos(attrition.newPlayerHex!);
+      setProgression((prev) => ({ ...prev, currency: attrition.newCurrency }));
+      applied = true;
+    }
+    if (applied) {
+      setCharacterState((prev) =>
+        prev ? { ...prev, lastActiveTimestamp: now.toISOString() } : prev
+      );
+      if (attrition.message) notify(attrition.message, 'info');
+    }
+  }, [persistHydrated, character, notify, placedEncounters, clearedHexes, playerPos, resources.wards, progression.currency, startingHexQ, startingHexR, cols, rows]);
 
   const movePlayer = useCallback(
     (q: number, r: number, id: string) => {

@@ -50,3 +50,8 @@ coverage/
 images/
 
 # Optional: omit public/campaign/omija/ from git when using Storage-only (VITE_CAMPAIGN_ASSETS_USE_PUBLIC=false).
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key

@@ -206,6 +206,69 @@ describe('persist-game-state', () => {
     expect(JSON.parse(raw!)).toMatchObject({ character: { name: validCharacter.name } });
   });
 
+  it('round-trips currentStreak and lastActiveTimestamp through Supabase persistence', async () => {
+    const character: Character = {
+      ...validCharacter,
+      currentStreak: 5,
+      lastActiveTimestamp: '2026-05-11T07:00:00-07:00',
+    };
+    const state: PersistedGameState = {
+      character,
+      mapState: getDefaultMapState(COLS, ROWS),
+    };
+    await persistGameStateToSupabase({
+      userId: USER_ID,
+      campaignId: CAMPAIGN_ID,
+      state,
+    });
+    expect(mocks.upsertChar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          currentStreak: 5,
+          lastActiveTimestamp: '2026-05-11T07:00:00-07:00',
+        }),
+      }),
+      { onConflict: 'user_id,campaign_id' }
+    );
+
+    mocks.maybeSingleChar.mockResolvedValue({
+      data: { payload: character },
+      error: null,
+    });
+    mocks.maybeSingleGs.mockResolvedValue({ data: null, error: null });
+    const loaded = await loadPersistedGameStateFromSupabase({
+      userId: USER_ID,
+      campaignId: CAMPAIGN_ID,
+      cols: COLS,
+      rows: ROWS,
+    });
+    expect(loaded!.character.currentStreak).toBe(5);
+    expect(loaded!.character.lastActiveTimestamp).toBe('2026-05-11T07:00:00-07:00');
+  });
+
+  it('loadPersistedGameStateFromSupabase backfills currentStreak when missing on legacy payload', async () => {
+    const { currentStreak: _omit, lastActiveTimestamp: _omit2, ...legacy } = {
+      ...validCharacter,
+      currentStreak: undefined,
+      lastActiveTimestamp: undefined,
+    };
+    void _omit;
+    void _omit2;
+    mocks.maybeSingleChar.mockResolvedValue({
+      data: { payload: legacy },
+      error: null,
+    });
+    mocks.maybeSingleGs.mockResolvedValue({ data: null, error: null });
+    const loaded = await loadPersistedGameStateFromSupabase({
+      userId: USER_ID,
+      campaignId: CAMPAIGN_ID,
+      cols: COLS,
+      rows: ROWS,
+    });
+    expect(loaded!.character.currentStreak).toBe(0);
+    expect(loaded!.character.lastActiveTimestamp).toBeUndefined();
+  });
+
   it('persistGameStateToSupabase does not call ensure RPC for non-omija campaign', async () => {
     const state: PersistedGameState = {
       character: validCharacter,

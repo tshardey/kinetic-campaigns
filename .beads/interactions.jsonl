@@ -1,0 +1,6 @@
+{"id":"int-4754a2b1","kind":"field_change","created_at":"2026-05-11T00:49:30.829387511Z","actor":"tshardey","issue_id":"kc-iy7.1","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-a9012a17","kind":"field_change","created_at":"2026-05-11T00:52:03.856302952Z","actor":"tshardey","issue_id":"kc-iy7.2","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-89eca9eb","kind":"field_change","created_at":"2026-05-11T00:53:22.437709801Z","actor":"tshardey","issue_id":"kc-iy7.3","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-42df622e","kind":"field_change","created_at":"2026-05-11T01:01:38.931402796Z","actor":"tshardey","issue_id":"kc-iy7.4","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-d6b07ce6","kind":"field_change","created_at":"2026-05-11T01:03:36.077003985Z","actor":"tshardey","issue_id":"kc-iy7.5","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-bbf0fd20","kind":"field_change","created_at":"2026-05-11T01:03:36.651673682Z","actor":"tshardey","issue_id":"kc-iy7","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}

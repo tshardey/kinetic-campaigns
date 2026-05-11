@@ -154,4 +154,48 @@ describe('CharacterPanel', () => {
       expect(within(inventoryToggle).getByText('1')).toBeInTheDocument();
     });
   });
+
+  describe('Streak indicator', () => {
+    it('renders the chip with 0d when no streak field is present (legacy character)', () => {
+      render(<CharacterPanel {...defaultProps} />);
+      const chip = screen.getByTestId('streak-chip');
+      expect(chip).toHaveTextContent('0d');
+      expect(chip).toHaveAttribute(
+        'aria-label',
+        expect.stringContaining('No active streak')
+      );
+    });
+
+    it('renders the active streak count and explanatory tooltip', () => {
+      const character: Character = { ...mockCharacter, currentStreak: 5 };
+      render(<CharacterPanel {...defaultProps} character={character} />);
+      const chip = screen.getByTestId('streak-chip');
+      expect(chip).toHaveTextContent('5d');
+      expect(chip).toHaveAttribute(
+        'aria-label',
+        expect.stringContaining('Active streak: 5 days')
+      );
+    });
+
+    it('uses singular day in the tooltip when streak is exactly 1', () => {
+      const character: Character = { ...mockCharacter, currentStreak: 1 };
+      render(<CharacterPanel {...defaultProps} character={character} />);
+      const chip = screen.getByTestId('streak-chip');
+      expect(chip).toHaveAttribute(
+        'aria-label',
+        expect.stringContaining('Active streak: 1 day.')
+      );
+    });
+
+    it('applies a different visual treatment for active vs zero streak', () => {
+      const { rerender } = render(<CharacterPanel {...defaultProps} />);
+      const inactive = screen.getByTestId('streak-chip');
+      expect(inactive.className).toMatch(/text-slate-500/);
+
+      const character: Character = { ...mockCharacter, currentStreak: 7 };
+      rerender(<CharacterPanel {...defaultProps} character={character} />);
+      const active = screen.getByTestId('streak-chip');
+      expect(active.className).toMatch(/text-orange-300/);
+    });
+  });
 });

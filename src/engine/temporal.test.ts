@@ -147,14 +147,29 @@ describe('evaluateTemporal', () => {
     expect(result.nextStreak).toBe(1);
   });
 
-  it('clamps negative currentStreak to 0 floor', () => {
+  it('same calendar day with currentStreak=0 starts a 1-day streak (post-attrition recovery)', () => {
+    // After Dimensional Bleed in the hook, currentStreak is 0 and lastActiveTimestamp is
+    // bumped to "now" for idempotency. The next user-initiated log should still establish
+    // a fresh 1-day streak — not be frozen at 0 by a max(0, 0) floor.
+    const result = evaluateTemporal({
+      lastActiveISO: '2026-05-11T08:00:00-07:00',
+      now: new Date('2026-05-11T20:00:00-07:00'),
+      timeZone: TZ,
+      currentStreak: 0,
+    });
+    expect(result.nextStreak).toBe(1);
+    expect(result.streakReset).toBe(false);
+    expect(result.isFirstActivity).toBe(false);
+  });
+
+  it('clamps nonsensical negative currentStreak up to 1 on a same-day log', () => {
     const result = evaluateTemporal({
       lastActiveISO: '2026-05-11T08:00:00-07:00',
       now: new Date('2026-05-11T20:00:00-07:00'),
       timeZone: TZ,
       currentStreak: -5,
     });
-    expect(result.nextStreak).toBe(0);
+    expect(result.nextStreak).toBe(1);
   });
 });
 

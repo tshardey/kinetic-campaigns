@@ -1249,6 +1249,30 @@ describe('useGameState', () => {
       expect(result.current.character!.currentStreak).toBe(after1);
     });
 
+    it('logWorkout starts a fresh 1-day streak when seeded with currentStreak=0 + same-day lastActiveTimestamp (post-attrition recovery)', () => {
+      // Repro of the production bug for cloud-loaded users whose cloud payload was
+      // written by a Dimensional Bleed run earlier today: currentStreak=0 with a
+      // recent lastActiveTimestamp. Without the same-day max(currentStreak, 1) fix
+      // they'd be frozen at streak=0 forever — every subsequent same-day log would
+      // return Math.max(0, 0) = 0 and never start a new streak.
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign })
+      );
+      const earlierToday = (() => {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        return d.toISOString();
+      })();
+      const stuck: Character = {
+        ...validCharacter,
+        currentStreak: 0,
+        lastActiveTimestamp: earlierToday,
+      };
+      act(() => result.current.setCharacter(stuck));
+      act(() => result.current.logWorkout('cardio', 20));
+      expect(result.current.character!.currentStreak).toBe(1);
+    });
+
     it('hitting the 3-day milestone grants currency and toasts', () => {
       const toast = vi.fn();
       const { result } = renderHook(() =>

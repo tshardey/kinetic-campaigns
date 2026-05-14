@@ -59,9 +59,12 @@ export function evaluateTemporal(input: EvaluateTemporalInput): EvaluateTemporal
   const dayDiff = calendarDayDiff(lastDate, now, timeZone);
 
   if (dayDiff <= 0) {
+    // Same calendar day: a fresh log must still establish at least a 1-day streak.
+    // The 0-floor would freeze users at 0 forever after an attrition reset that also
+    // moves lastActiveTimestamp into the same calendar day (see Dimensional Bleed in the hook).
     return {
       missedCalendarDays: 0,
-      nextStreak: Math.max(currentStreak, 0),
+      nextStreak: Math.max(currentStreak, 1),
       streakReset: false,
       isFirstActivity: false,
     };

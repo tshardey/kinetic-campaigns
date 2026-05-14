@@ -4,12 +4,9 @@ import {
   streakMilestoneReached,
   STREAK_MILESTONES,
   applyAttrition,
-  ATTRITION_CURRENCY_PER_MISSED_DAY,
   getStreakMilestoneCurrency,
   STREAK_MILESTONE_CURRENCY_PER_DAY,
 } from './temporal';
-
-const START_HEX = { q: 0, r: 0 };
 
 const TZ = 'America/Los_Angeles';
 
@@ -200,17 +197,21 @@ describe('applyAttrition', () => {
   const baseInput = {
     missedCalendarDays: 0,
     wards: 5,
+    aether: 5,
+    hp: 5,
+    maxHp: 5,
     hexHasUnclearedEncounter: true,
-    startHex: START_HEX,
-    currency: 1000,
+    hasDefyReality: false,
+    inventoryCount: 0,
   };
 
   it('no-op when missedCalendarDays is 0', () => {
     const r = applyAttrition({ ...baseInput, missedCalendarDays: 0 });
     expect(r.wardsSpent).toBe(0);
-    expect(r.newWards).toBe(5);
-    expect(r.retreatTriggered).toBe(false);
-    expect(r.currencyPenalty).toBe(0);
+    expect(r.aetherSpent).toBe(0);
+    expect(r.hpLost).toBe(0);
+    expect(r.knockbackTriggered).toBe(false);
+    expect(r.bumpFromHex).toBe(false);
     expect(r.message).toBeUndefined();
   });
 
@@ -221,80 +222,130 @@ describe('applyAttrition', () => {
       hexHasUnclearedEncounter: false,
     });
     expect(r.wardsSpent).toBe(0);
-    expect(r.retreatTriggered).toBe(false);
+    expect(r.aetherSpent).toBe(0);
+    expect(r.hpLost).toBe(0);
+    expect(r.bumpFromHex).toBe(false);
     expect(r.message).toBeUndefined();
   });
 
-  it('1 missed day with sufficient Wards: drains 1 Ward, no retreat', () => {
+  it('1 missed day with sufficient Wards: spends 1 Ward, bumps to adjacent', () => {
     const r = applyAttrition({ ...baseInput, missedCalendarDays: 1, wards: 3 });
     expect(r.wardsSpent).toBe(1);
+    expect(r.aetherSpent).toBe(0);
     expect(r.newWards).toBe(2);
-    expect(r.retreatTriggered).toBe(false);
-    expect(r.currencyPenalty).toBe(0);
+    expect(r.bumpFromHex).toBe(true);
+    expect(r.knockbackTriggered).toBe(false);
     expect(r.message).toMatch(/1 Ward/);
   });
 
-  it('multi-day with sufficient Wards: drains all required Wards, no retreat', () => {
+  it('multi-day with sufficient Wards: drains required Wards, bumps once', () => {
     const r = applyAttrition({ ...baseInput, missedCalendarDays: 3, wards: 5 });
     expect(r.wardsSpent).toBe(3);
     expect(r.newWards).toBe(2);
-    expect(r.retreatTriggered).toBe(false);
-    expect(r.message).toMatch(/3 Wards.*3 missed days/);
+    expect(r.bumpFromHex).toBe(true);
+    expect(r.knockbackTriggered).toBe(false);
+    expect(r.message).toMatch(/3 Wards/);
   });
 
-  it('multi-day with partial Wards: spends all Wards, retreats, charges Currency for the shortfall', () => {
+  it('spills into Aether when Wards exhausted (Aether Shield universalized)', () => {
     const r = applyAttrition({
       ...baseInput,
       missedCalendarDays: 4,
       wards: 1,
-      currency: 1000,
+      aether: 5,
     });
     expect(r.wardsSpent).toBe(1);
+    expect(r.aetherSpent).toBe(3);
     expect(r.newWards).toBe(0);
-    expect(r.retreatTriggered).toBe(true);
-    expect(r.newPlayerHex).toEqual(START_HEX);
-    expect(r.currencyPenalty).toBe(3 * ATTRITION_CURRENCY_PER_MISSED_DAY);
-    expect(r.newCurrency).toBe(1000 - r.currencyPenalty);
-    expect(r.message).toMatch(/Wards depleted.*Currency/);
+    expect(r.newAether).toBe(2);
+    expect(r.hpLost).toBe(0);
+    expect(r.bumpFromHex).toBe(true);
+    expect(r.knockbackTriggered).toBe(false);
+    expect(r.message).toMatch(/1 Ward.*3 Aether/);
   });
 
-  it('0 Wards with missed days: retreats and drains Currency for all missed days', () => {
+  it('spills into HP after Wards and Aether are spent', () => {
+    const r = applyAttrition({
+      ...baseInput,
+      missedCalendarDays: 4,
+      wards: 1,
+      aether: 1,
+      hp: 5,
+      maxHp: 5,
+    });
+    expect(r.wardsSpent).toBe(1);
+    expect(r.aetherSpent).toBe(1);
+    expect(r.hpLost).toBe(2);
+    expect(r.newHp).toBe(3);
+    expect(r.bumpFromHex).toBe(true);
+    expect(r.knockbackTriggered).toBe(false);
+  });
+
+  it('zero resources: HP damage only, knockback at 0 HP', () => {
+    const r = applyAttrition({
+      ...baseInput,
+      missedCalendarDays: 6,
+      wards: 0,
+      aether: 0,
+      hp: 5,
+      maxHp: 5,
+    });
+    expect(r.wardsSpent).toBe(0);
+    expect(r.aetherSpent).toBe(0);
+    // 4 days of -1 HP brings hp 5→1; 5th day at hp=1 triggers knockback (counted as hpLost += hp).
+    expect(r.hpLost).toBe(5);
+    expect(r.newHp).toBe(5);
+    expect(r.knockbackTriggered).toBe(true);
+    expect(r.bumpFromHex).toBe(false);
+    expect(r.message).toMatch(/retreated to safety/);
+  });
+
+  it('Defy Reality dodges the lethal hit and consumes 1 inventory item', () => {
+    const r = applyAttrition({
+      ...baseInput,
+      missedCalendarDays: 5,
+      wards: 0,
+      aether: 0,
+      hp: 2,
+      maxHp: 5,
+      hasDefyReality: true,
+      inventoryCount: 1,
+    });
+    // hp 2→1; then at hp=1 Defy Reality fires, sacrificing 1 item and restoring hp to maxHp.
+    // After Defy: hp=5; remaining 3 days drain hp 5→2.
+    expect(r.hpLost).toBe(1 + 3);
+    expect(r.defyRealityItemsSpent).toBe(1);
+    expect(r.newHp).toBe(2);
+    expect(r.knockbackTriggered).toBe(false);
+    expect(r.bumpFromHex).toBe(true);
+    expect(r.message).toMatch(/Defy Reality/);
+  });
+
+  it('Defy Reality with no inventory: lethal hit still knocks back', () => {
     const r = applyAttrition({
       ...baseInput,
       missedCalendarDays: 2,
       wards: 0,
-      currency: 500,
+      aether: 0,
+      hp: 1,
+      maxHp: 5,
+      hasDefyReality: true,
+      inventoryCount: 0,
     });
-    expect(r.wardsSpent).toBe(0);
-    expect(r.retreatTriggered).toBe(true);
-    expect(r.newPlayerHex).toEqual(START_HEX);
-    expect(r.currencyPenalty).toBe(2 * ATTRITION_CURRENCY_PER_MISSED_DAY);
-    expect(r.newCurrency).toBe(500 - r.currencyPenalty);
-    expect(r.message).toMatch(/retreated you to safety/);
-    expect(r.message).not.toMatch(/Wards depleted/);
+    expect(r.knockbackTriggered).toBe(true);
+    expect(r.defyRealityItemsSpent).toBe(0);
+    expect(r.newHp).toBe(5);
+    expect(r.bumpFromHex).toBe(false);
   });
 
-  it('Currency penalty cannot drive Currency below 0', () => {
+  it('reports no Currency penalty (removed in v2)', () => {
     const r = applyAttrition({
       ...baseInput,
-      missedCalendarDays: 10,
+      missedCalendarDays: 5,
       wards: 0,
-      currency: 30,
+      aether: 0,
+      hp: 5,
     });
-    expect(r.currencyPenalty).toBe(30);
-    expect(r.newCurrency).toBe(0);
-    expect(r.retreatTriggered).toBe(true);
-  });
-
-  it('returns a fresh startHex copy (caller mutation cannot leak back)', () => {
-    const r = applyAttrition({
-      ...baseInput,
-      missedCalendarDays: 1,
-      wards: 0,
-      startHex: { q: 7, r: -3 },
-    });
-    expect(r.newPlayerHex).toEqual({ q: 7, r: -3 });
-    r.newPlayerHex!.q = 999;
-    expect(START_HEX).toEqual({ q: 0, r: 0 });
+    expect(r).not.toHaveProperty('currencyPenalty');
   });
 });

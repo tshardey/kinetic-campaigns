@@ -1327,7 +1327,7 @@ describe('useGameState', () => {
       expect(result.current.character!.currentStreak).toBe(0);
     });
 
-    it('hydrate-time attrition: 0 Wards triggers retreat + currency penalty', () => {
+    it('hydrate-time attrition: 0 Wards but Aether available spends Aether and bumps to adjacent (Aether Shield universalized)', () => {
       const { placedEncounters, hexId } = makeUnclearedEncounterAtPlayer();
       const [q, r] = hexId.split(',').map(Number);
       const twoDaysAgo = (() => {
@@ -1337,7 +1337,7 @@ describe('useGameState', () => {
       })();
       const seeded: Character = {
         ...validCharacter,
-        resources: { ...validCharacter.resources, wards: 0 },
+        resources: { ...validCharacter.resources, wards: 0, aether: 2 },
         progression: { ...validCharacter.progression, currency: 500 },
         currentStreak: 3,
         lastActiveTimestamp: twoDaysAgo,
@@ -1351,10 +1351,54 @@ describe('useGameState', () => {
       const { result } = renderHook(() =>
         useGameState({ cols: COLS, rows: ROWS, campaign, placedEncounters })
       );
-      // 2-day gap = 1 missed day → 1 day × $50/day = -$50
-      expect(result.current.progression.currency).toBe(500 - 50);
-      expect(result.current.playerPos).toEqual({ q: startQ, r: startR });
+      // 2-day gap = 1 missed day → Aether absorbs the hit (Ward→Aether→HP pipeline).
+      expect(result.current.resources.aether).toBe(1);
+      expect(result.current.resources.wards).toBe(0);
+      // Currency is no longer touched by attrition.
+      expect(result.current.progression.currency).toBe(500);
+      // Player is bumped to a random adjacent non-occupied hex, NOT all the way back to start.
+      const newPos = result.current.playerPos;
+      expect(newPos).not.toEqual({ q, r });
+      const dq = Math.abs(newPos.q - q);
+      const dr = Math.abs(newPos.r - r);
+      const ds = Math.abs(-newPos.q - newPos.r - (-q - r));
+      expect(Math.max(dq, dr, ds)).toBe(1);
+      // Reaching this hex by attrition does not magically retreat all the way home.
+      const bumpedToStart = newPos.q === startQ && newPos.r === startR;
+      expect(bumpedToStart).toBe(false);
+      // Missed-day streak reset still fires.
       expect(result.current.character!.currentStreak).toBe(0);
+    });
+
+    it('hydrate-time attrition: 0 Wards + 0 Aether deals HP damage and bumps to adjacent', () => {
+      const { placedEncounters, hexId } = makeUnclearedEncounterAtPlayer();
+      const [q, r] = hexId.split(',').map(Number);
+      const twoDaysAgo = (() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 2);
+        return d.toISOString();
+      })();
+      const seeded: Character = {
+        ...validCharacter,
+        resources: { ...validCharacter.resources, wards: 0, aether: 0 },
+        hp: 5,
+        maxHp: 5,
+        currentStreak: 3,
+        lastActiveTimestamp: twoDaysAgo,
+      };
+      const mapState = { ...getDefaultMapState(COLS, ROWS), playerPos: { q, r } };
+      saveGameStateLocal({ character: seeded, mapState });
+
+      const { result } = renderHook(() =>
+        useGameState({ cols: COLS, rows: ROWS, campaign, placedEncounters })
+      );
+      // 1 missed day, no Wards or Aether: -1 HP and bump to adjacent.
+      expect(result.current.character!.hp).toBe(4);
+      const newPos = result.current.playerPos;
+      const dq = Math.abs(newPos.q - q);
+      const dr = Math.abs(newPos.r - r);
+      const ds = Math.abs(-newPos.q - newPos.r - (-q - r));
+      expect(Math.max(dq, dr, ds)).toBe(1);
     });
 
     it('does not re-apply attrition when dependent state changes after the one-shot ran', () => {

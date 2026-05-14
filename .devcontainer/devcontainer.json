@@ -5,7 +5,7 @@
     "ghcr.io/devcontainers-extra/features/supabase-cli:1": {},
     "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
   },
-  "postCreateCommand": "(if [ -f package.json ]; then npm install; fi) && npm install -g @beads/bd",
+  "postCreateCommand": "(if [ -f package.json ]; then npm install; fi) && npm install -g @beads/bd && sudo ln -sfn /home/node /home/vscode",
   "forwardPorts": [5173, 54321, 54322],
   "initializeCommand": "node -e \"require('fs').mkdirSync(require('path').join(process.env.USERPROFILE||process.env.HOME,'.claude'),{recursive:true})\"",
   "mounts": [

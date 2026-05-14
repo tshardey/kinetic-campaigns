@@ -14,7 +14,7 @@ import type { CampaignPackage } from '@/types/campaign';
 import type { RiftProgress, CampaignStatus } from '@/lib/game-state-storage';
 import { applyActivity, canAffordMove, spendSlipstream, canAffordEncounter, spendForEncounter, spendStrikes, spendWards, spendAether } from '@/engine/resources';
 import { applyEncounterRewardWithLevelUpFlow, spendCurrency, addCurrency } from '@/engine/progression';
-import { getAdjacentHexIds, getHexIdsAtDistance } from '@/engine/hex-math';
+import { getAdjacentHexIds, getHexIdsAtDistance, isHexInRectBounds } from '@/engine/hex-math';
 import { getDefaultStartHexId } from '@/engine/encounter-placement';
 import { applyArtifactOnAcquisition, getConsumableEffect, lootDropToInventoryItem } from '@/engine/inventory';
 import { canAffordRiftStage, spendForRiftStage } from '@/engine/rift';
@@ -376,11 +376,33 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
 
     const now = new Date();
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    // Cloud save can be killed by a fast tab close; the localStorage mirror in the save
+    // effect catches that case. Prefer whichever activity timestamp is freshest so we
+    // don't reset the streak on a load that lost the last day's cloud upsert.
+    let lastActiveISO = character.lastActiveTimestamp;
+    let lastActiveStreak = character.currentStreak ?? 0;
+    const localBackup = loadGameStateLocal(cols, rows);
+    const localLastActive = localBackup?.character?.lastActiveTimestamp;
+    if (localLastActive) {
+      const localMs = new Date(localLastActive).getTime();
+      const charMs = lastActiveISO ? new Date(lastActiveISO).getTime() : 0;
+      if (Number.isFinite(localMs) && localMs > charMs) {
+        lastActiveISO = localLastActive;
+        lastActiveStreak = localBackup!.character!.currentStreak ?? lastActiveStreak;
+        setCharacterState((prev) =>
+          prev
+            ? { ...prev, currentStreak: lastActiveStreak, lastActiveTimestamp: lastActiveISO }
+            : prev
+        );
+      }
+    }
+
     const result = evaluateTemporal({
-      lastActiveISO: character.lastActiveTimestamp,
+      lastActiveISO,
       now,
       timeZone,
-      currentStreak: character.currentStreak ?? 0,
+      currentStreak: lastActiveStreak,
     });
 
     if (result.isFirstActivity || result.missedCalendarDays === 0) return;
@@ -406,19 +428,59 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
     const attrition = applyAttrition({
       missedCalendarDays: result.missedCalendarDays,
       wards: resources.wards,
+      aether: resources.aether,
+      hp: character.hp ?? character.maxHp ?? 5,
+      maxHp: character.maxHp ?? 5,
       hexHasUnclearedEncounter,
-      startHex,
-      currency: progression.currency,
+      hasDefyReality: hasCharacterMove(character, 'defy-reality'),
+      inventoryCount: inventory.length,
     });
 
     let applied = false;
-    if (attrition.wardsSpent > 0) {
-      setResources((prev) => ({ ...prev, wards: attrition.newWards }));
+    if (attrition.wardsSpent > 0 || attrition.aetherSpent > 0) {
+      setResources((prev) => ({
+        ...prev,
+        wards: attrition.newWards,
+        aether: attrition.newAether,
+      }));
       applied = true;
     }
-    if (attrition.retreatTriggered) {
-      setPlayerPos(attrition.newPlayerHex!);
-      setProgression((prev) => ({ ...prev, currency: attrition.newCurrency }));
+    if (attrition.defyRealityItemsSpent > 0) {
+      setInventory((prev) => prev.slice(attrition.defyRealityItemsSpent));
+      applied = true;
+    }
+    if (attrition.hpLost > 0 || attrition.defyRealityItemsSpent > 0) {
+      setCharacterState((prev) => (prev ? { ...prev, hp: attrition.newHp } : prev));
+      applied = true;
+    }
+    if (attrition.knockbackTriggered) {
+      setPlayerPos(startHex);
+      applied = true;
+    } else if (attrition.bumpFromHex) {
+      const candidates = getAdjacentHexIds(playerPos.q, playerPos.r)
+        .map((id) => {
+          const [q, r] = id.split(',').map(Number);
+          return { id, q, r };
+        })
+        .filter(({ id, q, r }) => {
+          if (!isHexInRectBounds(q, r, cols, rows)) return false;
+          const enc = placedEncounters[id];
+          if (enc && enc.type !== 'anomaly' && !clearedHexes.has(id)) return false;
+          return true;
+        });
+      if (candidates.length > 0) {
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        setPlayerPos({ q: pick.q, r: pick.r });
+        setRevealedHexes((rev) => {
+          if (rev.has(pick.id)) return rev;
+          const next = new Set(rev);
+          next.add(pick.id);
+          getAdjacentHexIds(pick.q, pick.r).forEach((adjId) => next.add(adjId));
+          return next;
+        });
+      } else {
+        setPlayerPos(startHex);
+      }
       applied = true;
     }
     if (applied) {
@@ -427,7 +489,7 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
       );
       if (attrition.message) notify(attrition.message, 'info');
     }
-  }, [persistHydrated, character, notify, placedEncounters, clearedHexes, playerPos, resources.wards, progression.currency, startingHexQ, startingHexR, cols, rows]);
+  }, [persistHydrated, character, inventory, notify, placedEncounters, clearedHexes, playerPos, resources.wards, resources.aether, startingHexQ, startingHexR, cols, rows]);
 
   const movePlayer = useCallback(
     (q: number, r: number, id: string) => {
@@ -1026,27 +1088,25 @@ export function useGameState({ cols, rows, campaign, placedEncounters = {}, toas
       pendingProgressionAfterLevelUp: pendingProgressionAfterLevelUp ?? undefined,
     };
 
+    // Mirror to localStorage synchronously on every save — protects streak/lastActiveTimestamp
+    // if the debounced cloud save is killed by a fast tab close. The hydrate path prefers cloud
+    // but the temporal-eval effect falls back to this backup when it's fresher.
+    saveGameStateLocal(state);
+
     if (useCloud && user) {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
+        saveTimerRef.current = null;
         void persistGameStateToSupabase({
           userId: user.id,
           campaignId,
           state,
         });
-      }, 400);
-    } else {
-      saveGameStateLocal(state);
+      }, 100);
     }
-
-    // Always clear the debounced cloud save on dep change or unmount, including when
-    // switching from cloud to local or when auth drops — not only when the last run used cloud.
-    return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = null;
-      }
-    };
+    // No cleanup: a pending cloud save should fire even if a dep change or unmount happens
+    // before the 100ms timer elapses. The next effect run will replace the timer via the
+    // body's own clearTimeout, so debouncing across rapid commits still works.
   }, [
     character,
     resources,

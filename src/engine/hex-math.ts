@@ -235,6 +235,19 @@ export function getAdjacentHexIds(q: number, r: number): string[] {
 }
 
 /**
+ * Whether (q, r) falls inside a rectangular `cols × rows` odd-r grid.
+ */
+export function isHexInRectBounds(
+  q: number,
+  r: number,
+  cols: number,
+  rows: number
+): boolean {
+  const { col, row } = axialToOffset(q, r);
+  return col >= 0 && col < cols && row >= 0 && row < rows;
+}
+
+/**
  * Get hex ids at exactly the given distance (e.g. 2 = next ring out from adjacent).
  */
 export function getHexIdsAtDistance(q: number, r: number, distance: number): string[] {

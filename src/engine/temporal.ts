@@ -2,8 +2,10 @@
  * Calendar-day comparison, streak evaluation, and Dimensional Bleed attrition.
  * Pure logic — no React, no Supabase, no side effects.
  *
- * Attrition deliberately diverges from the standard Ward → Aether → HP `applyDamage` pipeline:
- * idle penalty drains Wards only, then retreats + spends Currency. Aether and HP are not touched.
+ * Attrition mirrors the standard Ward → Aether → HP `applyDamage` pipeline, dealing 1 point
+ * of damage per missed day. After any damage lands the caller bumps the player to an
+ * adjacent non-occupied hex; only when HP would hit 0 (without Defy Reality) does the player
+ * fully retreat to startHex.
  */
 
 export interface EvaluateTemporalInput {
@@ -97,75 +99,126 @@ export interface ApplyAttritionInput {
   missedCalendarDays: number;
   /** Current Ward count. */
   wards: number;
+  /** Current Aether count. */
+  aether: number;
+  /** Current HP. */
+  hp: number;
+  /** Max HP (restored on knockback). */
+  maxHp: number;
   /** True only when the player is currently parked on a hex with a hostile encounter that has not been cleared. */
   hexHasUnclearedEncounter: boolean;
-  /** Realm starting hex — destination when retreat is triggered. */
-  startHex: { q: number; r: number };
-  /** Current Currency balance — penalty cannot drive this below zero. */
-  currency: number;
+  /** True when the player has Defy Reality (Gate-Crasher): consume 1 inventory to dodge a lethal hit. */
+  hasDefyReality: boolean;
+  /** Items the player can sacrifice via Defy Reality. */
+  inventoryCount: number;
 }
 
 export interface ApplyAttritionResult {
   /** Wards consumed by Dimensional Bleed (0 when no attrition). */
   wardsSpent: number;
+  /** Aether consumed once Wards run out. */
+  aetherSpent: number;
+  /** HP points lost once Wards and Aether are exhausted. */
+  hpLost: number;
   newWards: number;
-  /** True iff the player must be moved to `startHex`. */
-  retreatTriggered: boolean;
-  newPlayerHex?: { q: number; r: number };
-  currencyPenalty: number;
-  newCurrency: number;
+  newAether: number;
+  newHp: number;
+  /** Inventory items burnt by Defy Reality to dodge a lethal hit. */
+  defyRealityItemsSpent: number;
+  /** True iff HP would have hit 0 (without Defy Reality) — caller must retreat to startHex. */
+  knockbackTriggered: boolean;
+  /** True when any damage landed (and not knocked back) — caller bumps to an adjacent non-occupied hex. */
+  bumpFromHex: boolean;
   /** Toast-ready explanation, or undefined when no attrition was applied. */
   message?: string;
 }
 
-/** Currency drained per missed day once Wards run out. Tunable; wiring task may parameterize. */
-export const ATTRITION_CURRENCY_PER_MISSED_DAY = 50;
-
 export function applyAttrition(input: ApplyAttritionInput): ApplyAttritionResult {
   const noOp: ApplyAttritionResult = {
     wardsSpent: 0,
+    aetherSpent: 0,
+    hpLost: 0,
     newWards: input.wards,
-    retreatTriggered: false,
-    currencyPenalty: 0,
-    newCurrency: input.currency,
+    newAether: input.aether,
+    newHp: input.hp,
+    defyRealityItemsSpent: 0,
+    knockbackTriggered: false,
+    bumpFromHex: false,
   };
 
   if (input.missedCalendarDays <= 0) return noOp;
   if (!input.hexHasUnclearedEncounter) return noOp;
 
-  const wardsAvailable = Math.max(0, input.wards);
-  const wardsSpent = Math.min(wardsAvailable, input.missedCalendarDays);
-  const remainingDays = input.missedCalendarDays - wardsSpent;
-  const newWards = Math.max(0, input.wards - wardsSpent);
+  let wards = Math.max(0, input.wards);
+  let aether = Math.max(0, input.aether);
+  let hp = input.hp;
+  let wardsSpent = 0;
+  let aetherSpent = 0;
+  let hpLost = 0;
+  let defyRealityItemsSpent = 0;
+  let knockbackTriggered = false;
+  let inventoryRemaining = Math.max(0, input.inventoryCount);
 
-  if (remainingDays === 0) {
-    return {
-      wardsSpent,
-      newWards,
-      retreatTriggered: false,
-      currencyPenalty: 0,
-      newCurrency: input.currency,
-      message: `Dimensional Bleed cost you ${wardsSpent} Ward${wardsSpent === 1 ? '' : 's'} for ${input.missedCalendarDays} missed day${input.missedCalendarDays === 1 ? '' : 's'}.`,
-    };
+  for (let i = 0; i < input.missedCalendarDays; i++) {
+    if (wards >= 1) {
+      wards -= 1;
+      wardsSpent += 1;
+      continue;
+    }
+    if (aether >= 1) {
+      aether -= 1;
+      aetherSpent += 1;
+      continue;
+    }
+    if (hp <= 1) {
+      if (input.hasDefyReality && inventoryRemaining > 0) {
+        inventoryRemaining -= 1;
+        defyRealityItemsSpent += 1;
+        hp = input.maxHp;
+        continue;
+      }
+      hpLost += hp;
+      hp = input.maxHp;
+      knockbackTriggered = true;
+      break;
+    }
+    hp -= 1;
+    hpLost += 1;
   }
 
-  const currencyPenalty = Math.min(
-    Math.max(0, input.currency),
-    remainingDays * ATTRITION_CURRENCY_PER_MISSED_DAY
-  );
-  const newCurrency = Math.max(0, input.currency - currencyPenalty);
+  const anyDamage =
+    wardsSpent > 0 || aetherSpent > 0 || hpLost > 0 || defyRealityItemsSpent > 0;
+  const bumpFromHex = anyDamage && !knockbackTriggered;
+
+  let message: string | undefined;
+  if (anyDamage) {
+    const parts: string[] = [];
+    if (wardsSpent > 0) parts.push(`${wardsSpent} Ward${wardsSpent === 1 ? '' : 's'}`);
+    if (aetherSpent > 0) parts.push(`${aetherSpent} Aether`);
+    if (hpLost > 0) parts.push(`${hpLost} HP`);
+    if (defyRealityItemsSpent > 0) {
+      parts.push(
+        `${defyRealityItemsSpent} item${defyRealityItemsSpent === 1 ? '' : 's'} (Defy Reality)`
+      );
+    }
+    const summary = parts.join(', ');
+    const dayWord = input.missedCalendarDays === 1 ? 'day' : 'days';
+    message = knockbackTriggered
+      ? `Dimensional Bleed cost you ${summary} over ${input.missedCalendarDays} missed ${dayWord} — retreated to safety.`
+      : `Dimensional Bleed cost you ${summary} for ${input.missedCalendarDays} missed ${dayWord}.`;
+  }
 
   return {
     wardsSpent,
-    newWards,
-    retreatTriggered: true,
-    newPlayerHex: { ...input.startHex },
-    currencyPenalty,
-    newCurrency,
-    message:
-      wardsSpent > 0
-        ? `Wards depleted (${wardsSpent} spent) — Dimensional Bleed retreated you to safety and drained ${currencyPenalty} Currency.`
-        : `Dimensional Bleed retreated you to safety and drained ${currencyPenalty} Currency for ${input.missedCalendarDays} missed day${input.missedCalendarDays === 1 ? '' : 's'}.`,
+    aetherSpent,
+    hpLost,
+    newWards: wards,
+    newAether: aether,
+    newHp: hp,
+    defyRealityItemsSpent,
+    knockbackTriggered,
+    bumpFromHex,
+    message,
   };
 }
 
